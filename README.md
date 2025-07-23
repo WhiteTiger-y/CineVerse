@@ -4,7 +4,6 @@
 
 > A smart, conversational movie recommender powered by Google Gemini and LangChain.
 
-*(**Note:** You can replace this placeholder URL with a screenshot of your own app\!)*
 
 -----
 
