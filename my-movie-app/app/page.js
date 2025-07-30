@@ -25,13 +25,17 @@ export default function LandingPage() {
         <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-8">
           Your personal movie sommelier. Engage in a conversation and discover the perfect film for any mood or occasion.
         </p>
-        <div className="flex justify-center gap-4">
+        <p className="text-s text-yellow-400/80">
+                Note: This application is in its alpha testing phase.
+        </p>
+        <div className="flex justify-center gap-5 mt-6">
           <Link href="/login" className="px-8 py-3 font-bold text-white bg-gradient-to-r from-fuchsia-600 to-pink-600 rounded-md hover:opacity-90 transition-opacity">
               Login
           </Link>
           <Link href="/signup" className="px-8 py-3 font-bold text-white bg-white/10 border border-white/20 rounded-md hover:bg-white/20 transition-all">
               Sign Up
           </Link>
+          
         </div>
       </div>
     </main>
