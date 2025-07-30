@@ -1,31 +1,30 @@
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+import os
+from dotenv import load_dotenv
 
-# 1. Define the database file location
-SQLALCHEMY_DATABASE_URL = "sqlite:///./cineverse.db"
+# Load environment variables
+load_dotenv()
 
-# 2. Create the SQLAlchemy engine for database connection
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+# Read the database URL from your .env file
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
-# 3. Create a session object to interact with the database
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# 4. Base class for our declarative data models
 Base = declarative_base()
 
-
-# --- Define Database Models (Tables) ---
-
+# --- Updated User Model ---
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=True) # Optional field
+    mobile_no = Column(String, unique=True, index=True, nullable=False)
+    username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
 
-    # This creates a link between a User and their suggested movies
     suggested_movies = relationship("SuggestedMovie", back_populates="owner")
 
 class SuggestedMovie(Base):
@@ -35,16 +34,12 @@ class SuggestedMovie(Base):
     movie_title = Column(String, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
 
-    # This creates a link back to the User who owns the suggestion
     owner = relationship("User", back_populates="suggested_movies")
 
-
 def create_db_and_tables():
-    """A helper function to create the database file and all defined tables."""
     print("Creating database and tables...")
     Base.metadata.create_all(bind=engine)
     print("Database and tables created successfully.")
 
-# This part allows you to run `python database.py` once to create the database
 if __name__ == "__main__":
     create_db_and_tables()
