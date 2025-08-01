@@ -1,19 +1,29 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 import os
 from dotenv import load_dotenv
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
-# Load environment variables
-load_dotenv()
+# --- THIS IS THE UPDATED SECTION ---
+# Find the absolute path to the .env file and load it
+# This ensures it's found regardless of where you run the script from
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+dotenv_path = os.path.join(BACKEND_DIR, '.env')
+load_dotenv(dotenv_path=dotenv_path)
+# ------------------------------------
 
-# Read the database URL from your .env file
+# This line will now work because the .env file has been loaded
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
+
+
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# --- Updated User Model ---
+
+# --- Define Database Models (Tables) ---
+
 class User(Base):
     __tablename__ = "users"
 
@@ -36,10 +46,13 @@ class SuggestedMovie(Base):
 
     owner = relationship("User", back_populates="suggested_movies")
 
+
 def create_db_and_tables():
+    """A helper function to create the database file and all defined tables."""
     print("Creating database and tables...")
     Base.metadata.create_all(bind=engine)
     print("Database and tables created successfully.")
 
+# This part allows you to run `python backend/database.py` once to create the database
 if __name__ == "__main__":
     create_db_and_tables()

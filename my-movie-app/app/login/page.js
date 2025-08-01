@@ -4,37 +4,14 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [emailStatus, setEmailStatus] = useState('');
   const { login } = useAuth();
   const router = useRouter();
-
-  const handleEmailCheck = async () => {
-    if (!email) {
-        setEmailStatus('');
-        return;
-    };
-    try {
-      const response = await fetch('http://127.0.0.1:8000/check-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await response.json();
-      if (!data.exists) {
-        setEmailStatus("Email not found. Please sign up.");
-      } else {
-        setEmailStatus("");
-      }
-    } catch (err) {
-      console.error("Email check failed", err);
-      setEmailStatus("Could not verify email.");
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,7 +21,7 @@ export default function LoginPage() {
       const response = await fetch('http://127.0.0.1:8000/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier: identifier, password }),
       });
 
       if (!response.ok) {
@@ -57,28 +34,26 @@ export default function LoginPage() {
       router.push('/chat');
 
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'An unexpected error occurred.');
     }
   };
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center shiny-gradient-bg p-4">
-      <div className="w-full max-w-md bg-slate-800/80 backdrop-blur-sm p-8 rounded-2xl shadow-3d-glow border border-white/20">
+      <div className="w-full max-w-md bg-gradient-to-br from-slate-800/80 to-slate-900/60 backdrop-blur-lg p-8 rounded-2xl shadow-3d-glow border border-purple-500/30">
         <h1 className="text-4xl font-orbitron text-center font-bold text-white mb-8">
           Login
         </h1>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-300">Email</label>
+            <label className="block text-sm font-medium text-gray-300">Email or Username</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onBlur={handleEmailCheck}
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               required
               className="mt-1 w-full p-3 bg-slate-900/50 rounded-md border border-gray-700 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
             />
-            {emailStatus && <p className="text-yellow-400 text-xs mt-1">{emailStatus}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300">Password</label>
@@ -90,11 +65,21 @@ export default function LoginPage() {
               className="mt-1 w-full p-3 bg-slate-900/50 rounded-md border border-gray-700 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
             />
           </div>
+           <div className="text-right text-sm">
+              <Link href="/forgot-password" className="font-medium text-purple-400 hover:text-purple-300">
+                Forgot password?
+              </Link>
+            </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <div>
-            <button type="submit" className="w-full py-3 px-4 font-bold text-white bg-gradient-to-r from-fuchsia-600 to-pink-600 rounded-md hover:opacity-90 transition-opacity">
+            <motion.button 
+              whileTap={{ scale: 0.95 }}
+              transition={{ duration: 0.1 }}
+              type="submit" 
+              className="w-full py-3 px-4 font-bold text-white bg-gradient-to-r from-fuchsia-600 to-pink-600 rounded-md hover:opacity-90 transition-opacity"
+            >
               Login
-            </button>
+            </motion.button>
           </div>
         </form>
         <div className="text-center mt-6 space-y-2">
