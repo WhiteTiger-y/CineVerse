@@ -12,8 +12,6 @@
 
 > An intelligent, conversational movie recommendation engine powered by Google Gemini and LangChain, featuring a complete user authentication system and a sleek, modern UI.
 
-*(**Note:** Replace this URL with a new screenshot of your app\!)*
-
 -----
 
 ## 🤖 About The Project
