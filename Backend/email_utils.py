@@ -45,7 +45,8 @@ def send_welcome_email(to_email: str, first_name: str, username: str):
 def send_password_reset_email(to_email: str, token: str):
     """Sends a password reset email to a user using Brevo."""
     sender_email = os.getenv("SENDER_EMAIL")
-    reset_url = f"http://localhost:3000/reset-password?token={token}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    reset_url = f"{frontend_url}/reset-password?token={token}"
 
     subject = "Your CineVerse AI Password Reset Request"
     html_content = f"""

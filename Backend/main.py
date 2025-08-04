@@ -130,6 +130,31 @@ def reset_password(request: schemas.ResetPasswordRequest, db: Session = Depends(
     crud.update_user_password(db=db, user=user, new_password=request.new_password)
     return {"message": "Password updated successfully."}
 
+@app.put("/account/username", response_model=schemas.User)
+def update_user_username(request: schemas.UsernameUpdate, db: Session = Depends(get_db)):
+    # Check if the new username is already taken
+    existing_user = crud.get_user_by_username(db, username=request.new_username)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username is already taken.")
+    
+    # Update the username
+    return crud.update_username(db=db, user_id=request.user_id, new_username=request.new_username)
+
+@app.put("/account/password")
+def update_user_password_route(request: schemas.PasswordUpdate, db: Session = Depends(get_db)):
+    user = crud.get_user_by_id(db, user_id=request.user_id) # You'll need to create get_user_by_id in crud.py
+    
+    # Verify the old password is correct
+    if not security.verify_password(request.old_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect old password.")
+    
+    # Update to the new password
+    crud.update_user_password(db=db, user=user, new_password=request.new_password)
+    return {"message": "Password updated successfully."}
+
+@app.put("/account/profile-pic", response_model=schemas.User)
+def update_user_profile_pic(request: schemas.ProfilePicUpdate, db: Session = Depends(get_db)):
+    return crud.update_profile_pic_url(db=db, user_id=request.user_id, url=request.url)
 
 # --- LangChain Agent Setup ---
 PROJECT_ROOT_DIR = os.path.dirname(BACKEND_DIR)

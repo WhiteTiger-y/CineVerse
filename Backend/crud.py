@@ -42,3 +42,23 @@ def update_user_password(db: Session, user: database.User, new_password: str):
     db.commit()
     db.refresh(user)
     return user
+
+def update_profile_pic_url(db: Session, user_id: int, url: str):
+    """Updates a user's profile picture URL in the database."""
+    db_user = db.query(database.User).filter(database.User.id == user_id).first()
+    if db_user:
+        db_user.profile_pic_url = url
+        db.commit()
+        db.refresh(db_user)
+    return db_user
+
+def get_user_by_id(db: Session, user_id: int):
+    return db.query(database.User).filter(database.User.id == user_id).first()
+
+def update_username(db: Session, user_id: int, new_username: str):
+    db_user = get_user_by_id(db, user_id)
+    if db_user:
+        db_user.username = new_username
+        db.commit()
+        db.refresh(db_user)
+    return db_user

@@ -1,0 +1,22 @@
+{
+  "builds": [
+    {
+      "src": "frontend/next.config.mjs",
+      "use": "@vercel/next"
+    },
+    {
+      "src": "backend/main.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/frontend"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/backend/main.py"
+    }
+  ]
+}

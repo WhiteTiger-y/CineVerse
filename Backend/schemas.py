@@ -18,7 +18,7 @@ class User(BaseModel):
     mobile_no: str
     username: str
     email: EmailStr
-
+    profile_pic_url: Optional[str] = None  # New field for profile picture URL
     class Config:
         from_attributes = True
 
@@ -40,3 +40,16 @@ class ResetPasswordRequest(BaseModel):
 
 class MobileCheck(BaseModel):
     mobile_no: str
+
+class UsernameUpdate(BaseModel):
+    user_id: int
+    new_username: str
+
+class PasswordUpdate(BaseModel):
+    user_id: int
+    old_password: str
+    new_password: str
+
+class ProfilePicUpdate(BaseModel):
+    user_id: int
+    url: str

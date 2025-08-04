@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import MessageList from '../components/MessageList';
 import InputBar from '../components/InputBar';
+import Navbar from '../components/Navbar'; // Import the new Navbar
 
 export default function ChatPage() {
   const { user, logout } = useAuth();
@@ -17,7 +18,7 @@ export default function ChatPage() {
         return JSON.parse(savedMessages);
       }
     }
-    return [{ sender: 'bot', text: `Welcome to CineVerse! How can I help find the perfect movie for you today?` }];
+    return [{ sender: 'bot', text: `Welcome! How can I help find the perfect movie for you today?` }];
   });
 
   const [input, setInput] = useState('');
@@ -42,7 +43,6 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, { sender: 'bot', text: "Error: You are not logged in correctly. Please try refreshing or logging in again." }]);
       return;
     }
-
     if (!input.trim() || isLoading) return;
 
     const userMessage = { sender: 'user', text: input };
@@ -50,7 +50,7 @@ export default function ChatPage() {
     setInput('');
     setIsLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/chat', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -58,16 +58,13 @@ export default function ChatPage() {
           session_id: String(user.user_id),
         }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Network response was not ok');
       }
-
       const botData = await response.json();
       const botMessage = { sender: 'bot', text: botData.message };
       setMessages((prev) => [...prev, botMessage]);
-
     } catch (error) {
       console.error('API call failed:', error);
       const errorMessage = {
@@ -91,33 +88,27 @@ export default function ChatPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center shiny-gradient-bg p-4">
-      <div
-        className="w-full max-w-3xl h-[85vh] bg-transparent rounded-2xl flex flex-col transition-all duration-300 hover:scale-[1.03] drop-shadow-3d-glow"
-      >
-        <div className="p-4 rounded-t-2xl shadow-lg bg-title-dark flex justify-between items-center">
-          <h1 className="text-2xl font-orbitron text-center font-bold text-white/90 tracking-widest">
-            CineVerse AI
-          </h1>
-          <button onClick={handleLogout} className="text-sm text-gray-300 hover:text-white transition-colors duration-200">
-            Logout
-          </button>
-        </div>
-        
-        <div className="flex-grow bg-chat-area dotted-texture overflow-y-auto">
-          <MessageList messages={messages} />
-        </div>
-
-        {isLoading && (
-          <div className="p-2 text-sm text-pink-300 animate-pulse bg-chat-area text-center">
-            Bot is typing...
+    <main className="flex flex-col h-screen w-screen shiny-gradient-bg">
+      <Navbar user={user} handleLogout={handleLogout} />
+      
+      <div className="flex-grow flex items-center justify-center p-4">
+        <div className="w-full max-w-3xl h-full bg-transparent rounded-2xl flex flex-col drop-shadow-3d-glow">
+          
+          <div className="flex-grow bg-chat-area dotted-texture overflow-y-auto rounded-t-2xl">
+            <MessageList messages={messages} />
           </div>
-        )}
-        <InputBar
-          input={input}
-          setInput={setInput}
-          handleSendMessage={handleSendMessage}
-        />
+
+          {isLoading && (
+            <div className="p-2 text-sm text-pink-300 animate-pulse bg-chat-area text-center">
+              Bot is typing...
+            </div>
+          )}
+          <InputBar
+            input={input}
+            setInput={setInput}
+            handleSendMessage={handleSendMessage}
+          />
+        </div>
       </div>
     </main>
   );
