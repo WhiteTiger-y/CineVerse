@@ -1,21 +1,19 @@
+import os
 import pandas as pd
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_pinecone import PineconeVectorStore
 from langchain.docstore.document import Document
 from dotenv import load_dotenv
-import os
 
-# --- THIS IS THE UPDATED PATH LOGIC ---
-# Get the directory of the current script (backend)
+# --- Load Environment Variables ---
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-# Get the parent directory (the main project root)
 PROJECT_ROOT_DIR = os.path.dirname(BACKEND_DIR)
-# Construct the path to the .env file inside the backend folder
 dotenv_path = os.path.join(BACKEND_DIR, '.env')
 load_dotenv(dotenv_path=dotenv_path)
-# ------------------------------------
 
-# --- Configuration ---
+# --- Pinecone and Data Configuration ---
+INDEX_NAME = "cineverse-movies" 
+
 # Update these keys to match the exact column names in your CSV file
 column_mapping = {
     "title": "title",
@@ -27,14 +25,13 @@ column_mapping = {
     "languages": "languages",
     "release_date": "release_date"
 }
-# Make sure your CSV file is in the main project folder
 csv_file_path = os.path.join(PROJECT_ROOT_DIR, 'your_movie_dataset.csv')
-# --------------------
 
+# --- Data Loading and Processing ---
 print(f"Loading data from {csv_file_path}...")
 df = pd.read_csv(csv_file_path, usecols=list(column_mapping.values()), low_memory=False)
 df.dropna(subset=[column_mapping["description"]], inplace=True)
-df = df.head(5000)
+df = df.head(63510)
 print(f"Processing {len(df)} movies...")
 
 documents = []
@@ -55,16 +52,19 @@ for _, row in df.iterrows():
     }
     documents.append(Document(page_content=page_content, metadata=metadata))
 
-print("Initializing embeddings model...")
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+# --- Initialize Hugging Face Embedding Model ---
+print("Initializing Hugging Face embeddings model...")
+model_name = "microsoft/multilingual-e5-large"
+model_kwargs = {'device': 'cpu'}
+encode_kwargs = {'normalize_embeddings': False}
+embeddings = HuggingFaceEmbeddings(
+    model_name=model_name,
+    model_kwargs=model_kwargs,
+    encode_kwargs=encode_kwargs
+)
 
-print("Creating vector store... (This may take a few minutes)")
-vector_store = FAISS.from_documents(documents, embeddings)
+# --- Upload to Pinecone ---
+print(f"Uploading {len(documents)} documents to Pinecone index '{INDEX_NAME}'... (This may take a while the first time as the model downloads)")
+PineconeVectorStore.from_documents(documents, embeddings, index_name=INDEX_NAME)
 
-# --- SAVE TO THE CORRECT LOCATION ---
-# Construct the full path to save the index in the main project folder
-faiss_index_path_to_save = os.path.join(PROJECT_ROOT_DIR, "movie_faiss_index")
-vector_store.save_local(faiss_index_path_to_save)
-# ------------------------------------
-
-print(f"\nVector store created and saved successfully in '{faiss_index_path_to_save}' folder.")
+print(f"\nVector store populated in Pinecone index '{INDEX_NAME}' successfully.")

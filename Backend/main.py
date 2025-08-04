@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
 # LangChain Imports
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain_community.vectorstores import FAISS
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_pinecone import PineconeVectorStore
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain.tools.retriever import create_retriever_tool
 from langchain.tools import Tool
@@ -49,26 +50,15 @@ def get_db():
 
 # --- Authentication and User Endpoints ---
 
-@app.post("/check-email")
-def check_user_email(request: schemas.EmailCheck, db: Session = Depends(get_db)):
-    db_user = crud.get_user_by_email(db, email=request.email)
-    if db_user:
-        return {"exists": True}
-    return {"exists": False}
-
-# --- Add this new endpoint ---
-@app.post("/check-mobile")
-def check_user_mobile(request: schemas.MobileCheck, db: Session = Depends(get_db)):
-    db_user = crud.get_user_by_mobile(db, mobile_no=request.mobile_no)
-    if db_user:
-        return {"exists": True}
-    return {"exists": False}
-
 @app.post("/signup", response_model=schemas.User)
 def signup_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user_by_email = crud.get_user_by_email(db, email=user.email)
     if db_user_by_email:
         raise HTTPException(status_code=400, detail="Email already registered")
+    
+    db_user_by_username = crud.get_user_by_username(db, username=user.username)
+    if db_user_by_username:
+        raise HTTPException(status_code=400, detail="Username already taken")
     
     db_user_by_mobile = crud.get_user_by_mobile(db, mobile_no=user.mobile_no)
     if db_user_by_mobile:
@@ -76,7 +66,6 @@ def signup_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
     new_user = crud.create_user(db=db, user=user)
     
-    # Send welcome email after user is created
     email_utils.send_welcome_email(
         to_email=new_user.email,
         first_name=new_user.first_name,
@@ -91,13 +80,13 @@ def login_user(user_login: schemas.UserLogin, db: Session = Depends(get_db)):
         db_user = crud.get_user_by_email(db, email=user_login.identifier)
     else:
         db_user = crud.get_user_by_username(db, username=user_login.identifier)
-
+    
     if not db_user or not security.verify_password(user_login.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect username/email or password")
-
+    
     return {
-        "message": "Login successful",
-        "user_id": db_user.id,
+        "message": "Login successful", 
+        "user_id": db_user.id, 
         "email": db_user.email,
         "username": db_user.username
     }
@@ -105,6 +94,13 @@ def login_user(user_login: schemas.UserLogin, db: Session = Depends(get_db)):
 @app.post("/check-email")
 def check_user_email(request: schemas.EmailCheck, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=request.email)
+    if db_user:
+        return {"exists": True}
+    return {"exists": False}
+
+@app.post("/check-mobile")
+def check_user_mobile(request: schemas.MobileCheck, db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_mobile(db, mobile_no=request.mobile_no)
     if db_user:
         return {"exists": True}
     return {"exists": False}
@@ -122,33 +118,24 @@ def reset_password(request: schemas.ResetPasswordRequest, db: Session = Depends(
     email = security.verify_reset_token(token=request.token)
     if not email:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
-    
     user = crud.get_user_by_email(db, email=email)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
     crud.update_user_password(db=db, user=user, new_password=request.new_password)
     return {"message": "Password updated successfully."}
 
 @app.put("/account/username", response_model=schemas.User)
 def update_user_username(request: schemas.UsernameUpdate, db: Session = Depends(get_db)):
-    # Check if the new username is already taken
     existing_user = crud.get_user_by_username(db, username=request.new_username)
     if existing_user:
         raise HTTPException(status_code=400, detail="Username is already taken.")
-    
-    # Update the username
     return crud.update_username(db=db, user_id=request.user_id, new_username=request.new_username)
 
 @app.put("/account/password")
 def update_user_password_route(request: schemas.PasswordUpdate, db: Session = Depends(get_db)):
-    user = crud.get_user_by_id(db, user_id=request.user_id) # You'll need to create get_user_by_id in crud.py
-    
-    # Verify the old password is correct
+    user = crud.get_user_by_id(db, user_id=request.user_id)
     if not security.verify_password(request.old_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect old password.")
-    
-    # Update to the new password
     crud.update_user_password(db=db, user=user, new_password=request.new_password)
     return {"message": "Password updated successfully."}
 
@@ -156,26 +143,95 @@ def update_user_password_route(request: schemas.PasswordUpdate, db: Session = De
 def update_user_profile_pic(request: schemas.ProfilePicUpdate, db: Session = Depends(get_db)):
     return crud.update_profile_pic_url(db=db, user_id=request.user_id, url=request.url)
 
+
 # --- LangChain Agent Setup ---
-PROJECT_ROOT_DIR = os.path.dirname(BACKEND_DIR)
-FAISS_INDEX_PATH = os.path.join(PROJECT_ROOT_DIR, "movie_faiss_index")
-chat_histories = {} # Temporary in-memory history
+INDEX_NAME = "cineverse-movies"
+chat_histories = {} 
 
+# Initialize Models
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.4, convert_system_message_to_human=True)
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
-if not os.path.isdir(FAISS_INDEX_PATH):
-    print(f"Error: FAISS index not found at '{FAISS_INDEX_PATH}'.", file=sys.stderr)
-    sys.exit(1)
+# Initialize Hugging Face Embedding Model
+model_name = "microsoft/multilingual-e5-large"
+model_kwargs = {'device': 'cpu'}
+encode_kwargs = {'normalize_embeddings': False}
+embeddings = HuggingFaceEmbeddings(
+    model_name=model_name,
+    model_kwargs=model_kwargs,
+    encode_kwargs=encode_kwargs
+)
 
-print(f"Loading FAISS index from '{FAISS_INDEX_PATH}'...")
-vector_store = FAISS.load_local(FAISS_INDEX_PATH, embeddings, allow_dangerous_deserialization=True)
+# Connect to the existing Pinecone index
+print(f"Connecting to Pinecone index '{INDEX_NAME}'...")
+vector_store = PineconeVectorStore.from_existing_index(
+    index_name=INDEX_NAME,
+    embedding=embeddings
+)
 retriever = vector_store.as_retriever()
-print("FAISS index loaded successfully.")
+print("Successfully connected to Pinecone.")
 
-# ... (Your agent and tools setup remains here)
+# Define Agent Tools
+retriever_tool = create_retriever_tool(
+    retriever,
+    "movie_database_search",
+    "Searches and returns information about movies from a database."
+)
 
-# --- Chat Endpoint ---
+def scrape_webpage(url: str) -> str:
+    try:
+        headers = { "User-Agent": "Mozilla/5.0..." }
+        loader = WebBaseLoader(url, requests_kwargs={"headers": headers})
+        docs = loader.load()
+        return "".join(doc.page_content for doc in docs)
+    except Exception as e:
+        return f"Error scraping website: {e}"
+
+web_scraper_tool = Tool(
+    name="web_scraper_tool",
+    func=scrape_webpage,
+    description="A tool to scrape a single webpage for very recent movies."
+)
+
+tools = [retriever_tool, web_scraper_tool]
+
+# Create Agent Prompt
+prompt_template = """
+You are CineVerse AI, a friendly, empathetic, and conversational chatbot. Your main goal is to chat with the user and help them discover a movie they'll love.
+Instead of waiting for direct questions, engage the user in a natural conversation. Ask indirect, open-ended questions to understand what they might be feeling or looking for.
+
+You have access to the following tools:
+{tools}
+
+Use the following format:
+
+Question: the input question you must answer
+Thought: you should always think about what to do
+Action: the action to take, should be one of [{tool_names}]
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Final Answer: the final answer to the original input question. This should be a friendly and conversational response.
+
+Previous conversation history:
+{chat_history}
+
+Question: {input}
+Thought:{agent_scratchpad}
+"""
+prompt = PromptTemplate.from_template(prompt_template)
+
+# Create the agent and executor
+agent = create_react_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    verbose=True,
+    handle_parsing_errors=True
+)
+
+
+# --- API Endpoints ---
 class ChatRequest(BaseModel):
     message: str
     session_id: str
@@ -186,11 +242,21 @@ def read_root():
 
 @app.post("/chat")
 async def handle_chat(request: ChatRequest):
-    # This logic will be updated later to use the database for history
     chat_history = chat_histories.get(request.session_id, [])
-    # ... (Your agent invocation logic remains here)
+    response = await agent_executor.ainvoke({
+        "input": request.message,
+        "chat_history": chat_history,
+    })
+    output = response.get('output', "I'm sorry, I encountered an issue.")
+    chat_history.extend([
+        HumanMessage(content=request.message),
+        AIMessage(content=output),
+    ])
+    chat_histories[request.session_id] = chat_history
+    return {"sender": "bot", "message": output}
 
-# --- Main Entry Point to Run the App ---
+
+# --- Main Entry Point ---
 if __name__ == "__main__":
     print("Starting CineVerse AI server on http://127.0.0.1:8000")
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                         >
-                            <p className="text-gray-300 mb-8">Enter your email and we'll send a reset link.</p>
+                            <p className="text-gray-300 mb-8">Enter your email and we&apos;ll send a reset link.</p>
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <input 
                                     type="email" 
