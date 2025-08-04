@@ -149,10 +149,10 @@ INDEX_NAME = "cineverse-movies"
 chat_histories = {} 
 
 # Initialize Models
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.4, convert_system_message_to_human=True)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4, convert_system_message_to_human=True)
 
 # Initialize Hugging Face Embedding Model
-model_name = "microsoft/multilingual-e5-large"
+model_name = "intfloat/multilingual-e5-large" 
 model_kwargs = {'device': 'cpu'}
 encode_kwargs = {'normalize_embeddings': False}
 embeddings = HuggingFaceEmbeddings(

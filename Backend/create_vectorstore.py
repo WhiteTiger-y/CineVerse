@@ -25,15 +25,36 @@ column_mapping = {
     "languages": "languages",
     "release_date": "release_date"
 }
-csv_file_path = os.path.join(PROJECT_ROOT_DIR, 'your_movie_dataset.csv')
+csv_file_path = os.path.join(PROJECT_ROOT_DIR, 'Backend/final_dataset.csv')
 
 # --- Data Loading and Processing ---
 print(f"Loading data from {csv_file_path}...")
 df = pd.read_csv(csv_file_path, usecols=list(column_mapping.values()), low_memory=False)
 df.dropna(subset=[column_mapping["description"]], inplace=True)
-df = df.head(63510)
-print(f"Processing {len(df)} movies...")
+print(f"Loaded {len(df)} movies, now cleaning data...")
 
+# --- THIS IS THE NEW DATA CLEANING SECTION ---
+# Replace NaN values to prevent JSON serialization errors
+# For numeric columns like rating, 0.0 is a safe default
+df[column_mapping['rating']] = df[column_mapping['rating']].fillna(0.0)
+# For text-based columns, an empty string is a safe default
+text_cols = [
+    column_mapping['title'], 
+    column_mapping['genres'], 
+    column_mapping['languages'], 
+    column_mapping['release_date'],
+    column_mapping['duration'],
+    column_mapping['year'] # Treat year and duration as text for simplicity
+]
+for col in text_cols:
+    if col in df.columns:
+        df[col] = df[col].fillna('')
+# ---------------------------------------------
+
+df = df.head(64000)  # Limit to first 64,000 entries for performance
+print(f"Processing {len(df)} cleaned movies...")
+
+# Create LangChain Document objects
 documents = []
 for _, row in df.iterrows():
     page_content = (
@@ -42,19 +63,19 @@ for _, row in df.iterrows():
         f"Description: {row[column_mapping['description']]}"
     )
     metadata = {
-        "title": row[column_mapping['title']],
-        "year": row[column_mapping['year']],
-        "duration": row[column_mapping['duration']],
-        "rating": row[column_mapping['rating']],
-        "genres": row[column_mapping['genres']],
-        "languages": row[column_mapping['languages']],
-        "release_date": row[column_mapping['release_date']]
+        "title": str(row[column_mapping['title']]),
+        "year": str(row[column_mapping['year']]),
+        "duration": str(row[column_mapping['duration']]),
+        "rating": float(row[column_mapping['rating']]),
+        "genres": str(row[column_mapping['genres']]),
+        "languages": str(row[column_mapping['languages']]),
+        "release_date": str(row[column_mapping['release_date']])
     }
     documents.append(Document(page_content=page_content, metadata=metadata))
 
 # --- Initialize Hugging Face Embedding Model ---
 print("Initializing Hugging Face embeddings model...")
-model_name = "microsoft/multilingual-e5-large"
+model_name = "intfloat/multilingual-e5-large"
 model_kwargs = {'device': 'cpu'}
 encode_kwargs = {'normalize_embeddings': False}
 embeddings = HuggingFaceEmbeddings(
