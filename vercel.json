@@ -1,22 +1,22 @@
 {
   "builds": [
     {
-      "src": "frontend/next.config.mjs",
+      "src": "my-movie-app/next.config.mjs",
       "use": "@vercel/next"
     },
     {
-      "src": "backend/main.py",
+      "src": "Backend/main.py",
       "use": "@vercel/python"
     }
   ],
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/backend/main.py"
+      "destination": "/Backend/main.py"
     },
     {
       "source": "/(.*)",
-      "destination": "/frontend"
+      "destination": "/my-movie-app"
     }
   ]
 }
