@@ -1,11 +1,12 @@
 import os
+import requests
 import pandas as pd
-from langchain_huggingface import HuggingFaceInferenceAPIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain.docstore.document import Document
+from langchain_core.embeddings import Embeddings
 from dotenv import load_dotenv
 from tqdm import tqdm
-import torch
+from typing import List
 
 # --- Load Environment Variables ---
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -74,11 +75,31 @@ for _, row in df.iterrows():
 # --- Initialize Hugging Face Embedding Model ---
 print("Initializing Hugging Face embeddings model...")
 
-# Auto-detect and select the best available device (GPU or CPU)
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-print(f"Using device: {device}")
+class CustomHuggingFaceInferenceAPIEmbeddings(Embeddings):
+    def __init__(self, api_key: str, model_name: str):
+        self.api_key = api_key
+        self.model_name = model_name
+        self.api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
+        self.headers = {"Authorization": f"Bearer {api_key}"}
 
-embeddings = HuggingFaceInferenceAPIEmbeddings(
+    def _embed(self, texts: List[str]) -> List[List[float]]:
+        response = requests.post(
+            self.api_url,
+            headers=self.headers,
+            json={"inputs": texts, "options": {"wait_for_model": True}}
+        )
+        if response.status_code != 200:
+            raise Exception(f"HuggingFace API request failed with status {response.status_code}: {response.text}")
+        return response.json()
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return self._embed(texts)
+
+    def embed_query(self, text: str) -> List[float]:
+        return self._embed([text])[0]
+    
+print("Initializing Custom Hugging Face embeddings...")
+embeddings = CustomHuggingFaceInferenceAPIEmbeddings(
     api_key=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
     model_name="intfloat/multilingual-e5-large"
 )

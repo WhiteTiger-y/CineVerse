@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
 # LangChain Imports
+import requests
+from typing import List
+from langchain_core.embeddings import Embeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_huggingface import HuggingFaceInferenceAPIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain.tools.retriever import create_retriever_tool
@@ -18,6 +20,29 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import AIMessage, HumanMessage
 
+class CustomHuggingFaceInferenceAPIEmbeddings(Embeddings):
+    def __init__(self, api_key: str, model_name: str):
+        self.api_key = api_key
+        self.model_name = model_name
+        self.api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
+        self.headers = {"Authorization": f"Bearer {api_key}"}
+
+    def _embed(self, texts: List[str]) -> List[List[float]]:
+        response = requests.post(
+            self.api_url,
+            headers=self.headers,
+            json={"inputs": texts, "options": {"wait_for_model": True}}
+        )
+        if response.status_code != 200:
+            raise Exception(f"HuggingFace API request failed with status {response.status_code}: {response.text}")
+        return response.json()
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return self._embed(texts)
+
+    def embed_query(self, text: str) -> List[float]:
+        return self._embed([text])[0]
+    
 # --- Load Environment Variables Correctly ---
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 dotenv_path = os.path.join(BACKEND_DIR, '.env')
@@ -152,7 +177,7 @@ chat_histories = {}
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4, convert_system_message_to_human=True)
 
 # Initialize Hugging Face Embedding Model
-embeddings = HuggingFaceInferenceAPIEmbeddings(
+embeddings = CustomHuggingFaceInferenceAPIEmbeddings(
     api_key=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
     model_name="intfloat/multilingual-e5-large"
 )
