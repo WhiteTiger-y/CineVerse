@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 # LangChain Imports
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_huggingface import HuggingFaceInferenceAPIEmbeddin
+from langchain_huggingface import HuggingFaceInferenceAPIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain.tools.retriever import create_retriever_tool
