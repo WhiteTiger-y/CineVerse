@@ -4,6 +4,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain.docstore.document import Document
 from dotenv import load_dotenv
+from tqdm import tqdm
+import torch
 
 # --- Load Environment Variables ---
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,7 +27,8 @@ column_mapping = {
     "languages": "languages",
     "release_date": "release_date"
 }
-csv_file_path = os.path.join(PROJECT_ROOT_DIR, 'Backend/final_dataset.csv')
+# Assuming your CSV is in the Backend folder
+csv_file_path = os.path.join(BACKEND_DIR, 'final_dataset.csv') 
 
 # --- Data Loading and Processing ---
 print(f"Loading data from {csv_file_path}...")
@@ -33,28 +36,23 @@ df = pd.read_csv(csv_file_path, usecols=list(column_mapping.values()), low_memor
 df.dropna(subset=[column_mapping["description"]], inplace=True)
 print(f"Loaded {len(df)} movies, now cleaning data...")
 
-# --- THIS IS THE NEW DATA CLEANING SECTION ---
-# Replace NaN values to prevent JSON serialization errors
-# For numeric columns like rating, 0.0 is a safe default
+# --- Data Cleaning Section ---
 df[column_mapping['rating']] = df[column_mapping['rating']].fillna(0.0)
-# For text-based columns, an empty string is a safe default
 text_cols = [
     column_mapping['title'], 
     column_mapping['genres'], 
     column_mapping['languages'], 
     column_mapping['release_date'],
     column_mapping['duration'],
-    column_mapping['year'] # Treat year and duration as text for simplicity
+    column_mapping['year']
 ]
 for col in text_cols:
     if col in df.columns:
         df[col] = df[col].fillna('')
-# ---------------------------------------------
 
-df = df.head(64000)  # Limit to first 64,000 entries for performance
+df = df.head(64000)
 print(f"Processing {len(df)} cleaned movies...")
 
-# Create LangChain Document objects
 documents = []
 for _, row in df.iterrows():
     page_content = (
@@ -75,8 +73,13 @@ for _, row in df.iterrows():
 
 # --- Initialize Hugging Face Embedding Model ---
 print("Initializing Hugging Face embeddings model...")
+
+# Auto-detect and select the best available device (GPU or CPU)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print(f"Using device: {device}")
+
 model_name = "intfloat/multilingual-e5-large"
-model_kwargs = {'device': 'cpu'}
+model_kwargs = {'device': device} # Use the detected device
 encode_kwargs = {'normalize_embeddings': False}
 embeddings = HuggingFaceEmbeddings(
     model_name=model_name,
@@ -84,8 +87,14 @@ embeddings = HuggingFaceEmbeddings(
     encode_kwargs=encode_kwargs
 )
 
-# --- Upload to Pinecone ---
-print(f"Uploading {len(documents)} documents to Pinecone index '{INDEX_NAME}'... (This may take a while the first time as the model downloads)")
-PineconeVectorStore.from_documents(documents, embeddings, index_name=INDEX_NAME)
+# --- Upload to Pinecone in Batches ---
+print(f"Uploading {len(documents)} documents to Pinecone index '{INDEX_NAME}'...")
+
+batch_size = 500
+index = PineconeVectorStore.from_existing_index(INDEX_NAME, embeddings)
+
+for i in tqdm(range(0, len(documents), batch_size)):
+    batch = documents[i:i + batch_size]
+    index.add_documents(batch)
 
 print(f"\nVector store populated in Pinecone index '{INDEX_NAME}' successfully.")

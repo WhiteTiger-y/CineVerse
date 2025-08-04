@@ -33,7 +33,7 @@ export default function SignupPage() {
         return;
     }
     try {
-      const response = await fetch('http://127.0.0.1:8000/check-mobile', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/check-mobile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile_no: mobileNo }),
@@ -56,7 +56,7 @@ export default function SignupPage() {
         return;
     };
     try {
-      const response = await fetch('http://127.0.0.1:8000/check-email', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/check-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
