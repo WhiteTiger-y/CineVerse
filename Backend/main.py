@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 # LangChain Imports
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceInferenceAPIEmbeddin
 from langchain_pinecone import PineconeVectorStore
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain.tools.retriever import create_retriever_tool
@@ -152,13 +152,9 @@ chat_histories = {}
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4, convert_system_message_to_human=True)
 
 # Initialize Hugging Face Embedding Model
-model_name = "intfloat/multilingual-e5-large" 
-model_kwargs = {'device': 'cpu'}
-encode_kwargs = {'normalize_embeddings': False}
-embeddings = HuggingFaceEmbeddings(
-    model_name=model_name,
-    model_kwargs=model_kwargs,
-    encode_kwargs=encode_kwargs
+embeddings = HuggingFaceInferenceAPIEmbeddings(
+    api_key=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
+    model_name="intfloat/multilingual-e5-large"
 )
 
 # Connect to the existing Pinecone index

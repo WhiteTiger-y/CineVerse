@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceInferenceAPIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain.docstore.document import Document
 from dotenv import load_dotenv
@@ -78,13 +78,9 @@ print("Initializing Hugging Face embeddings model...")
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f"Using device: {device}")
 
-model_name = "intfloat/multilingual-e5-large"
-model_kwargs = {'device': device} # Use the detected device
-encode_kwargs = {'normalize_embeddings': False}
-embeddings = HuggingFaceEmbeddings(
-    model_name=model_name,
-    model_kwargs=model_kwargs,
-    encode_kwargs=encode_kwargs
+embeddings = HuggingFaceInferenceAPIEmbeddings(
+    api_key=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
+    model_name="intfloat/multilingual-e5-large"
 )
 
 # --- Upload to Pinecone in Batches ---
