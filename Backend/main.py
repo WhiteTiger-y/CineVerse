@@ -181,7 +181,7 @@ INDEX_NAME = "cineverse-movies"
 chat_histories = {} 
 
 # Initialize Models
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.4, convert_system_message_to_human=True)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4, convert_system_message_to_human=True)
 
 # Initialize Custom Embedding Model
 embeddings = CustomHuggingFaceInferenceAPIEmbeddings(
