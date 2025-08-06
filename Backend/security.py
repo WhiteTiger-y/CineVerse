@@ -1,7 +1,7 @@
 import os
 from passlib.context import CryptContext
 from itsdangerous import URLSafeTimedSerializer
-
+from Backend import database
 # Load the secret key from environment variables
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:

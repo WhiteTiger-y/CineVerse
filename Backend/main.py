@@ -1,5 +1,12 @@
 import os
 import sys
+# --- THIS IS THE CRUCIAL FIX ---
+# Get the absolute path of the current file (main.py)
+current_file_path = os.path.dirname(os.path.abspath(__file__))
+# Get the path of the parent directory (the project root)
+project_root_path = os.path.dirname(current_file_path)
+# Add the project root to Python's path
+sys.path.append(project_root_path)
 import uvicorn
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel
