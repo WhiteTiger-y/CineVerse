@@ -1,22 +1,23 @@
 import os
 import sys
-# --- THIS IS THE CRUCIAL FIX ---
-# Get the absolute path of the current file (main.py)
-current_file_path = os.path.dirname(os.path.abspath(__file__))
-# Get the path of the parent directory (the project root)
-project_root_path = os.path.dirname(current_file_path)
-# Add the project root to Python's path
-sys.path.append(project_root_path)
+
+# --- THIS IS THE CRUCIAL PATHING FIX FOR DEPLOYMENT ---
+# This block makes your application's imports work reliably on any server.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+sys.path.insert(0, project_root)
+# ----------------------------------------------------
+
 import uvicorn
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
-
-# LangChain Imports
 import requests
 from typing import List
+
+# LangChain Imports
 from langchain_core.embeddings import Embeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_pinecone import PineconeVectorStore
@@ -27,8 +28,16 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import AIMessage, HumanMessage
 
+# --- Load Environment Variables ---
+dotenv_path = os.path.join(current_dir, '.env')
+load_dotenv(dotenv_path=dotenv_path)
+
+# --- Local Imports (now absolute from the project root) ---
 from Backend import crud, schemas, security, database, email_utils
 from Backend.database import SessionLocal
+
+# --- Custom Hugging Face Embeddings Class ---
+# This lightweight class replaces heavy libraries to keep the deployment small
 class CustomHuggingFaceInferenceAPIEmbeddings(Embeddings):
     def __init__(self, api_key: str, model_name: str):
         self.api_key = api_key
@@ -47,19 +56,12 @@ class CustomHuggingFaceInferenceAPIEmbeddings(Embeddings):
         return response.json()
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return self._embed(texts)
+        texts_with_prefix = ["query: " + text for text in texts]
+        return self._embed(texts_with_prefix)
 
     def embed_query(self, text: str) -> List[float]:
-        return self._embed([text])[0]
-    
-# --- Load Environment Variables Correctly ---
-BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-dotenv_path = os.path.join(BACKEND_DIR, '.env')
-load_dotenv(dotenv_path=dotenv_path)
-
-# --- Local Imports ---
-from . import crud, schemas, security, database, email_utils
-from .database import SessionLocal
+        text_with_prefix = "query: " + text
+        return self._embed([text_with_prefix])[0]
 
 # --- Create Database Tables ---
 database.Base.metadata.create_all(bind=database.engine)
@@ -89,10 +91,6 @@ def signup_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user_by_email = crud.get_user_by_email(db, email=user.email)
     if db_user_by_email:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
-    db_user_by_username = crud.get_user_by_username(db, username=user.username)
-    if db_user_by_username:
-        raise HTTPException(status_code=400, detail="Username already taken")
     
     db_user_by_mobile = crud.get_user_by_mobile(db, mobile_no=user.mobile_no)
     if db_user_by_mobile:
@@ -183,9 +181,9 @@ INDEX_NAME = "cineverse-movies"
 chat_histories = {} 
 
 # Initialize Models
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4, convert_system_message_to_human=True)
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.4, convert_system_message_to_human=True)
 
-# Initialize Hugging Face Embedding Model
+# Initialize Custom Embedding Model
 embeddings = CustomHuggingFaceInferenceAPIEmbeddings(
     api_key=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
     model_name="intfloat/multilingual-e5-large"
@@ -209,7 +207,7 @@ retriever_tool = create_retriever_tool(
 
 def scrape_webpage(url: str) -> str:
     try:
-        headers = { "User-Agent": "Mozilla/5.0..." }
+        headers = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" }
         loader = WebBaseLoader(url, requests_kwargs={"headers": headers})
         docs = loader.load()
         return "".join(doc.page_content for doc in docs)
@@ -226,14 +224,13 @@ tools = [retriever_tool, web_scraper_tool]
 
 # Create Agent Prompt
 prompt_template = """
-You are CineVerse AI, a friendly, empathetic, and conversational chatbot. Your main goal is to chat with the user and help them discover a movie they'll love.
-Instead of waiting for direct questions, engage the user in a natural conversation. Ask indirect, open-ended questions to understand what they might be feeling or looking for.
+You are CineVerse AI, a friendly, empathetic, and conversational chatbot.
+Engage the user in a natural conversation to understand what they might be feeling or looking for.
 
 You have access to the following tools:
 {tools}
 
 Use the following format:
-
 Question: the input question you must answer
 Thought: you should always think about what to do
 Action: the action to take, should be one of [{tool_names}]
@@ -241,7 +238,7 @@ Action Input: the input to the action
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
 Thought: I now know the final answer
-Final Answer: the final answer to the original input question. This should be a friendly and conversational response.
+Final Answer: the final answer to the original input question.
 
 Previous conversation history:
 {chat_history}
