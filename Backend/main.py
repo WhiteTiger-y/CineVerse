@@ -27,6 +27,8 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import AIMessage, HumanMessage
 
+from Backend import crud, schemas, security, database, email_utils
+from Backend.database import SessionLocal
 class CustomHuggingFaceInferenceAPIEmbeddings(Embeddings):
     def __init__(self, api_key: str, model_name: str):
         self.api_key = api_key
