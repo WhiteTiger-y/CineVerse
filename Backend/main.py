@@ -179,7 +179,7 @@ NAMESPACE = "movies"
 chat_histories = {} 
 
 # Initialize Models
-llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.4)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4)
 
 # Initialize Custom Embedding Model
 embeddings = CustomHuggingFaceInferenceAPIEmbeddings(
