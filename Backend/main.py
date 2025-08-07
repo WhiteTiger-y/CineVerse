@@ -81,7 +81,23 @@ def get_db():
         db.close()
 
 # --- Authentication and User Endpoints ---
+@app.on_event("startup")
+def startup_event():
+    print("--- Running Hugging Face API Connection Test ---")
+    api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+    if not api_key:
+        print("!!! TEST FAILED: HUGGINGFACEHUB_API_TOKEN not found in environment variables.")
+        return
 
+    test_client = InferenceClient(token=api_key)
+    try:
+        # We test by asking for info about the model, a simple and reliable call.
+        test_client.get_model_info("sentence-transformers/all-MiniLM-L6-v2")
+        print("✅ TEST SUCCESS: Successfully connected to Hugging Face Hub with the provided token.")
+    except Exception as e:
+        print(f"!!! TEST FAILED: Could not connect to Hugging Face Hub. Error: {e}")
+    print("---------------------------------------------")
+    
 @app.post("/signup", response_model=schemas.User)
 def signup_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user_by_email = crud.get_user_by_email(db, email=user.email)
