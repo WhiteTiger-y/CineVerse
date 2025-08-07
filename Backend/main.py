@@ -2,7 +2,6 @@ import os
 import sys
 
 # --- THIS IS THE CRUCIAL PATHING FIX FOR DEPLOYMENT ---
-# This block makes your application's imports work reliably on any server.
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 sys.path.insert(0, project_root)
@@ -36,8 +35,7 @@ load_dotenv(dotenv_path=dotenv_path)
 from Backend import crud, schemas, security, database, email_utils
 from Backend.database import SessionLocal
 
-# --- Custom Hugging Face Embeddings Class ---
-# This lightweight class uses the Hugging Face API without heavy local libraries
+# --- Custom Hugging Face Embeddings Class (API-based) ---
 class CustomHuggingFaceInferenceAPIEmbeddings(Embeddings):
     def __init__(self, api_key: str, model_name: str):
         self.api_key = api_key
@@ -46,9 +44,10 @@ class CustomHuggingFaceInferenceAPIEmbeddings(Embeddings):
         self.headers = {"Authorization": f"Bearer {api_key}"}
 
     def _embed(self, texts: List[str]) -> List[List[float]]:
-        response = self.client.feature_extraction(
-            texts,
-            model=self.model_name
+        response = requests.post(
+            self.api_url,
+            headers=self.headers,
+            json={"inputs": texts, "options": {"wait_for_model": True}}
         )
         if response.status_code != 200:
             raise Exception(f"HuggingFace API request failed with status {response.status_code}: {response.text}")
@@ -163,6 +162,8 @@ def update_user_username(request: schemas.UsernameUpdate, db: Session = Depends(
 @app.put("/account/password")
 def update_user_password_route(request: schemas.PasswordUpdate, db: Session = Depends(get_db)):
     user = crud.get_user_by_id(db, user_id=request.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     if not security.verify_password(request.old_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect old password.")
     crud.update_user_password(db=db, user=user, new_password=request.new_password)
@@ -174,7 +175,7 @@ def update_user_profile_pic(request: schemas.ProfilePicUpdate, db: Session = Dep
 
 
 # --- LangChain Agent Setup ---
-INDEX_NAME = "cineverse-ai"
+INDEX_NAME = "cineverse-movies"
 NAMESPACE = "movies"
 chat_histories = {} 
 
@@ -191,10 +192,11 @@ embeddings = CustomHuggingFaceInferenceAPIEmbeddings(
 print(f"Connecting to Pinecone index '{INDEX_NAME}'...")
 vector_store = PineconeVectorStore.from_existing_index(
     index_name=INDEX_NAME,
-    embedding=embeddings
+    embedding=embeddings,
+    namespace=NAMESPACE
 )
 retriever = vector_store.as_retriever()
-print("Successfully connected to Pinecone.")
+print(f"Successfully connected to Pinecone, using namespace '{NAMESPACE}'.")
 
 # Define Agent Tools
 retriever_tool = create_retriever_tool(
@@ -205,7 +207,7 @@ retriever_tool = create_retriever_tool(
 
 def scrape_webpage(url: str) -> str:
     try:
-        headers = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" }
+        headers = { "User-Agent": "Mozilla/5.0 (Windows NT 1.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" }
         loader = WebBaseLoader(url, requests_kwargs={"headers": headers})
         docs = loader.load()
         return "".join(doc.page_content for doc in docs)
