@@ -171,7 +171,7 @@ def update_user_profile_pic(request: schemas.ProfilePicUpdate, db: Session = Dep
 
 
 # --- LangChain Agent Setup ---
-INDEX_NAME = "cineverse-movies"
+INDEX_NAME = "cineverse-ai"
 NAMESPACE = "movies"
 chat_histories = {} 
 
