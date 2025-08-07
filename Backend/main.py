@@ -2,6 +2,7 @@ import os
 import sys
 
 # --- THIS IS THE CRUCIAL PATHING FIX FOR DEPLOYMENT ---
+# This block makes your application's imports work reliably on any server.
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 sys.path.insert(0, project_root)
@@ -13,8 +14,8 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
-import requests
 from typing import List
+from huggingface_hub import InferenceClient
 
 # LangChain Imports
 from langchain_core.embeddings import Embeddings
@@ -35,23 +36,18 @@ load_dotenv(dotenv_path=dotenv_path)
 from Backend import crud, schemas, security, database, email_utils
 from Backend.database import SessionLocal
 
-# --- Custom Hugging Face Embeddings Class (API-based) ---
-class CustomHuggingFaceInferenceAPIEmbeddings(Embeddings):
+# --- Custom Hugging Face Embeddings Class (using huggingface_hub) ---
+class CustomHuggingFaceHubEmbeddings(Embeddings):
     def __init__(self, api_key: str, model_name: str):
-        self.api_key = api_key
+        self.client = InferenceClient(token=api_key)
         self.model_name = model_name
-        self.api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
-        self.headers = {"Authorization": f"Bearer {api_key}"}
 
     def _embed(self, texts: List[str]) -> List[List[float]]:
-        response = requests.post(
-            self.api_url,
-            headers=self.headers,
-            json={"inputs": texts, "options": {"wait_for_model": True}}
+        response = self.client.feature_extraction(
+            texts,
+            model=self.model_name
         )
-        if response.status_code != 200:
-            raise Exception(f"HuggingFace API request failed with status {response.status_code}: {response.text}")
-        return response.json()
+        return response.tolist()
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         return self._embed(texts)
@@ -81,23 +77,7 @@ def get_db():
         db.close()
 
 # --- Authentication and User Endpoints ---
-@app.on_event("startup")
-def startup_event():
-    print("--- Running Hugging Face API Connection Test ---")
-    api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
-    if not api_key:
-        print("!!! TEST FAILED: HUGGINGFACEHUB_API_TOKEN not found in environment variables.")
-        return
 
-    test_client = InferenceClient(token=api_key)
-    try:
-        # We test by asking for info about the model, a simple and reliable call.
-        test_client.get_model_info("sentence-transformers/all-MiniLM-L6-v2")
-        print("✅ TEST SUCCESS: Successfully connected to Hugging Face Hub with the provided token.")
-    except Exception as e:
-        print(f"!!! TEST FAILED: Could not connect to Hugging Face Hub. Error: {e}")
-    print("---------------------------------------------")
-    
 @app.post("/signup", response_model=schemas.User)
 def signup_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user_by_email = crud.get_user_by_email(db, email=user.email)
@@ -191,7 +171,7 @@ def update_user_profile_pic(request: schemas.ProfilePicUpdate, db: Session = Dep
 
 
 # --- LangChain Agent Setup ---
-INDEX_NAME = "cineverse-ai"
+INDEX_NAME = "cineverse-movies"
 NAMESPACE = "movies"
 chat_histories = {} 
 
@@ -199,7 +179,7 @@ chat_histories = {}
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4)
 
 # Initialize Custom Embedding Model
-embeddings = CustomHuggingFaceInferenceAPIEmbeddings(
+embeddings = CustomHuggingFaceHubEmbeddings(
     api_key=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
@@ -223,7 +203,7 @@ retriever_tool = create_retriever_tool(
 
 def scrape_webpage(url: str) -> str:
     try:
-        headers = { "User-Agent": "Mozilla/5.0 (Windows NT 1.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" }
+        headers = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" }
         loader = WebBaseLoader(url, requests_kwargs={"headers": headers})
         docs = loader.load()
         return "".join(doc.page_content for doc in docs)
