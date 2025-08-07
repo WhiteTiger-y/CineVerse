@@ -6,6 +6,7 @@ uvicorn
 langchain
 langchain-community
 langchain-google-genai
+langchain-huggingface
 langchain-pinecone
 pinecone-client
 beautifulsoup4
@@ -22,3 +23,4 @@ python-dotenv
 sib-api-v3-sdk
 requests
 email-validator
+
