@@ -37,7 +37,7 @@ from Backend import crud, schemas, security, database, email_utils
 from Backend.database import SessionLocal
 
 # --- Custom Hugging Face Embeddings Class ---
-# This lightweight class replaces heavy libraries to keep the deployment small
+# This lightweight class uses the Hugging Face API without heavy local libraries
 class CustomHuggingFaceInferenceAPIEmbeddings(Embeddings):
     def __init__(self, api_key: str, model_name: str):
         self.api_key = api_key
@@ -46,22 +46,19 @@ class CustomHuggingFaceInferenceAPIEmbeddings(Embeddings):
         self.headers = {"Authorization": f"Bearer {api_key}"}
 
     def _embed(self, texts: List[str]) -> List[List[float]]:
-        response = requests.post(
-            self.api_url,
-            headers=self.headers,
-            json={"inputs": texts, "options": {"wait_for_model": True}}
+        response = self.client.feature_extraction(
+            texts,
+            model=self.model_name
         )
         if response.status_code != 200:
             raise Exception(f"HuggingFace API request failed with status {response.status_code}: {response.text}")
         return response.json()
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        texts_with_prefix = ["query: " + text for text in texts]
-        return self._embed(texts_with_prefix)
+        return self._embed(texts)
 
     def embed_query(self, text: str) -> List[float]:
-        text_with_prefix = "query: " + text
-        return self._embed([text_with_prefix])[0]
+        return self._embed([text])[0]
 
 # --- Create Database Tables ---
 database.Base.metadata.create_all(bind=database.engine)
@@ -181,12 +178,12 @@ INDEX_NAME = "cineverse-movies"
 chat_histories = {} 
 
 # Initialize Models
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4, convert_system_message_to_human=True)
+llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.4)
 
 # Initialize Custom Embedding Model
 embeddings = CustomHuggingFaceInferenceAPIEmbeddings(
     api_key=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
-    model_name="intfloat/multilingual-e5-large"
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
 # Connect to the existing Pinecone index
