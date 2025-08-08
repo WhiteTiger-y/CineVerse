@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import MessageList from '../components/MessageList';
 import InputBar from '../components/InputBar';
-import Navbar from '../components/Navbar'; // Import the new Navbar
+import Navbar from '../components/Navbar';
 
 export default function ChatPage() {
   const { user, logout } = useAuth();
@@ -91,9 +91,11 @@ export default function ChatPage() {
     <main className="flex flex-col h-screen w-screen shiny-gradient-bg">
       <Navbar user={user} handleLogout={handleLogout} />
       
-      <div className="flex-grow flex items-center justify-center p-4">
+      {/* This container will fill the remaining space and prevent page scroll */}
+      <div className="flex-grow flex items-center justify-center p-4 overflow-hidden">
         <div className="w-full max-w-3xl h-full bg-transparent rounded-2xl flex flex-col drop-shadow-3d-glow">
           
+          {/* This is now the ONLY scrollable element */}
           <div className="flex-grow bg-chat-area dotted-texture overflow-y-auto rounded-t-2xl">
             <MessageList messages={messages} />
           </div>
