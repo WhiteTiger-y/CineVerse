@@ -142,7 +142,7 @@ To get a local copy up and running, follow these steps.
 
   - **Live Deployment (Coming Soon\!)**
 
-      - The application will be deployed to **Vercel**, making it live and accessible to anyone with a link.
+      - The application will be deployed to **OnRender**, making it live and accessible to anyone with a link.
 
   - **Version 2.0: Account Management Hub**
 
