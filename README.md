@@ -1,16 +1,23 @@
+Of course. Based on all the incredible features you've built, here is a complete and descriptive `README.md` file that you can use for your GitHub repository.
+
+This captures the current state of your project, from the full-stack architecture to the advanced AI and authentication systems, and outlines the exciting future you have planned for it.
+
 -----
 
 # 🎬 CineVerse AI
 
-> Version 0.4.0 (Alpha Phase)
+> Current Version: 0.5.0 (Alpha Phase)
 
 [](https://nextjs.org/)
 [](https://fastapi.tiangolo.com/)
 [](https://www.langchain.com/)
 [](https://www.google.com/search?q=https://ai.google/discover/gemini/)
-[](https://vercel.com/)
+[](https://www.pinecone.io/)
+[](https://supabase.com/)
 
 > An intelligent, conversational movie recommendation engine powered by Google Gemini and LangChain, featuring a complete user authentication system and a sleek, modern UI.
+
+*(**Note:** Replace this URL with a new screenshot of your live app\!)*
 
 -----
 
@@ -29,21 +36,22 @@ The project features a complete user authentication system, a futuristic "glassm
   - **Secure User Signup:** Comprehensive registration with fields for first name, last name, mobile number, email, and password.
   - **Flexible Login:** Users can log in with either their unique username or their email address.
   - **Live Validation:** Real-time checks on the signup form to prevent duplicate emails or mobile numbers.
-  - **Password Reset Flow:** Complete "Forgot Password" functionality that sends a secure, time-sensitive reset link via email.
+  - **Complete Password Reset Flow:** "Forgot Password" functionality that sends a secure, time-sensitive reset link via email.
   - **Welcome Emails:** New users automatically receive a welcome email with their details upon registration.
+  - **Account Management:** A dedicated, protected page for logged-in users to change their username and password.
 
 ### AI Core & Functionality
 
   - **Conversational AI Agent:** Powered by **Google Gemini** and orchestrated with **LangChain** to provide natural, empathetic, and intelligent conversation.
   - **Dual-Tool System:**
-      - **Semantic Search:** Uses a FAISS vector database to perform semantic searches on a vast movie knowledge base.
+      - **Semantic Search:** Uses a **Pinecone** vector database to perform semantic searches on a knowledge base of nearly 1 million movies.
       - **Live Web Scraping:** Can access websites like IMDb in real-time to fetch information on the very latest movie releases.
 
 ### Frontend Experience
 
   - **Modern UI/UX:** A high-fidelity "glassmorphism" UI built with **Next.js** and styled with **Tailwind CSS**.
   - **Rich Animations:** Smooth page transitions and satisfying micro-interactions powered by **Framer Motion**.
-  - **Protected Routes:** The core chat application is only accessible to authenticated users.
+  - **Protected Routes:** The core chat and account pages are only accessible to authenticated users.
   - **Persistent Session:** Remembers the user's login status and chat history across page refreshes using `localStorage`.
 
 -----
@@ -56,8 +64,8 @@ The project features a complete user authentication system, a futuristic "glassm
 | **Backend** | Python, FastAPI |
 | **AI/LLM** | LangChain, Google Gemini |
 | **Database** | PostgreSQL (via Supabase), SQLAlchemy |
-| **Vector Store**| FAISS |
-| **Email Service** | SendGrid / Brevo |
+| **Vector Store**| Pinecone |
+| **Email Service** | Brevo |
 | **Security** | Passlib (for password hashing), Itsdangerous (for tokens) |
 
 -----
@@ -93,9 +101,7 @@ To get a local copy up and running, follow these steps.
     # Install Python packages from requirements.txt
     pip install -r requirements.txt
 
-    # Create the .env file for your secrets
-    # You can copy the provided .env.example if available
-    # Now, edit the .env file with your actual keys
+    # Create the .env file for your secrets and add your keys
     ```
 
     Your `backend/.env` file must contain:
@@ -103,9 +109,11 @@ To get a local copy up and running, follow these steps.
     ```env
     GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
     DATABASE_URL="YOUR_SUPABASE_POSTGRES_URL_(Transaction_Pooler)"
-    SENDGRID_API_KEY="YOUR_SENDGRID_OR_BREVO_API_KEY"
-    SENDER_EMAIL="YOUR_VERIFIED_SENDER_EMAIL"
+    PINECONE_API_KEY="YOUR_PINECONE_API_KEY"
+    HUGGINGFACEHUB_API_TOKEN="YOUR_HUGGINGFACE_READ_TOKEN"
     SECRET_KEY="A_LONG_RANDOM_SECRET_STRING_FOR_TOKENS"
+    BREVO_API_KEY="YOUR_BREVO_API_KEY"
+    SENDER_EMAIL="YOUR_VERIFIED_SENDER_EMAIL"
     ```
 
     ```sh
@@ -113,7 +121,7 @@ To get a local copy up and running, follow these steps.
     # 1. Create the tables on your cloud database
     python database.py
 
-    # 2. Build the movie vector store
+    # 2. Build the movie vector store (this can take a long time)
     python create_vectorstore.py
 
     # Run the backend server (from the main project root directory)
@@ -127,9 +135,19 @@ To get a local copy up and running, follow these steps.
     # In a new terminal, navigate to the frontend directory
     cd frontend
 
-    # Install NPM packages
+    # Install dependencies
     npm install
 
+    # Create the .env.local file for your frontend
+    ```
+
+    Your `frontend/.env.local` file must contain:
+
+    ```env
+    NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+    ```
+
+    ```sh
     # Run the frontend development server
     npm run dev
     ```
@@ -140,25 +158,16 @@ To get a local copy up and running, follow these steps.
 
 ## 🗺️ Roadmap & Future Features
 
-  - **Live Deployment (Coming Soon\!)**
+  - **Live Deployment (In Progress)**
 
-      - The application will be deployed to **OnRender**, making it live and accessible to anyone with a link.
+      - The application is being deployed to a cloud platform like **Render**, making it live and accessible.
 
-  - **Version 2.0: Account Management Hub**
+  - **Version 2.0: Enhanced Account Management**
 
-      - A dedicated `/account` page for logged-in users.
-      - **Username Change:** Ability for users to change their auto-generated username.
-      - **Password Change:** An in-app form for users to update their password.
-      - **Profile Picture Setup:** Allow users to upload and display a profile picture.
+      - **Profile Picture Setup:** Allow users to upload and display a profile picture using Supabase Storage.
 
   - **Version 3.0: Advanced AI & Memory**
 
       - **Database-Backed Chat History:** Store conversations in the database for a persistent, multi-device experience.
       - **Long-Term Movie Memory:** The agent will use the database to remember all movies suggested to a specific user to avoid repeats.
       - **Facial Expression Reader:** Integrate a custom ML model to analyze a user's live webcam feed for an even deeper understanding of their mood.
-
------
-
-## 📜 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
