@@ -29,13 +29,18 @@ export default function LandingPage() {
                 Note: This application is in its alpha testing phase.
         </p>
         <div className="flex justify-center gap-5 mt-6">
-          <Link href="/login" className="px-8 py-3 font-bold text-white bg-gradient-to-r from-fuchsia-600 to-pink-600 rounded-md hover:opacity-90 transition-opacity">
+          <Link 
+            href="/login" 
+            className="px-8 py-3 font-bold text-white bg-gradient-to-r from-fuchsia-600 to-pink-600 rounded-md hover:opacity-90 transition-all duration-150 active:scale-95 active:shadow-inner"
+          >
               Login
           </Link>
-          <Link href="/signup" className="px-8 py-3 font-bold text-white bg-white/10 border border-white/20 rounded-md hover:bg-white/20 transition-all">
+          <Link 
+            href="/signup" 
+            className="px-8 py-3 font-bold text-white bg-white/10 border border-white/20 rounded-md hover:bg-white/20 transition-all duration-150 active:scale-95 active:shadow-inner"
+          >
               Sign Up
           </Link>
-          
         </div>
       </div>
     </main>

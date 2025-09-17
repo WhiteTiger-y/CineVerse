@@ -16,8 +16,8 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
-import requests
 from typing import List
+from huggingface_hub import InferenceClient
 
 # LangChain Imports
 from langchain_core.embeddings import Embeddings
@@ -38,32 +38,24 @@ load_dotenv(dotenv_path=dotenv_path)
 from Backend import crud, schemas, security, database, email_utils
 from Backend.database import SessionLocal
 
-# --- Custom Hugging Face Embeddings Class ---
-# This lightweight class replaces heavy libraries to keep the deployment small
-class CustomHuggingFaceInferenceAPIEmbeddings(Embeddings):
+# --- Custom Hugging Face Embeddings Class (using huggingface_hub) ---
+class CustomHuggingFaceHubEmbeddings(Embeddings):
     def __init__(self, api_key: str, model_name: str):
-        self.api_key = api_key
+        self.client = InferenceClient(token=api_key)
         self.model_name = model_name
-        self.api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
-        self.headers = {"Authorization": f"Bearer {api_key}"}
 
     def _embed(self, texts: List[str]) -> List[List[float]]:
-        response = requests.post(
-            self.api_url,
-            headers=self.headers,
-            json={"inputs": texts, "options": {"wait_for_model": True}}
+        response = self.client.feature_extraction(
+            texts,
+            model=self.model_name
         )
-        if response.status_code != 200:
-            raise Exception(f"HuggingFace API request failed with status {response.status_code}: {response.text}")
-        return response.json()
+        return response.tolist()
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        texts_with_prefix = ["query: " + text for text in texts]
-        return self._embed(texts_with_prefix)
+        return self._embed(texts)
 
     def embed_query(self, text: str) -> List[float]:
-        text_with_prefix = "query: " + text
-        return self._embed([text_with_prefix])[0]
+        return self._embed([text])[0]
 
 # --- Create Database Tables ---
 database.Base.metadata.create_all(bind=database.engine)
@@ -292,6 +284,8 @@ def update_user_password_route(request: schemas.PasswordUpdate, db: Session = De
     if msg:
         raise HTTPException(status_code=400, detail=msg)
     user = crud.get_user_by_id(db, user_id=request.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     if not security.verify_password(request.old_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect old password.")
     crud.update_user_password(db=db, user=user, new_password=request.new_password)
@@ -305,26 +299,28 @@ def update_user_profile_pic(request: schemas.ProfilePicUpdate, db: Session = Dep
 
 
 # --- LangChain Agent Setup ---
-INDEX_NAME = "cineverse-movies"
+INDEX_NAME = "cineverse-ai"
+NAMESPACE = "movies"
 chat_histories = {} 
 
 # Initialize Models
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4, convert_system_message_to_human=True)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.4)
 
 # Initialize Custom Embedding Model
-embeddings = CustomHuggingFaceInferenceAPIEmbeddings(
+embeddings = CustomHuggingFaceHubEmbeddings(
     api_key=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
-    model_name="intfloat/multilingual-e5-large"
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
 # Connect to the existing Pinecone index
 print(f"Connecting to Pinecone index '{INDEX_NAME}'...")
 vector_store = PineconeVectorStore.from_existing_index(
     index_name=INDEX_NAME,
-    embedding=embeddings
+    embedding=embeddings,
+    namespace=NAMESPACE
 )
 retriever = vector_store.as_retriever()
-print("Successfully connected to Pinecone.")
+print(f"Successfully connected to Pinecone, using namespace '{NAMESPACE}'.")
 
 # Define Agent Tools
 retriever_tool = create_retriever_tool(
