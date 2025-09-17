@@ -16,6 +16,8 @@ export default function AccountPage() {
     
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
+    const [file, setFile] = useState(null);
+    const [preview, setPreview] = useState('');
 
     useEffect(() => {
         if (!user) {
@@ -32,7 +34,10 @@ export default function AccountPage() {
         try {
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/account/username`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(user?.access_token ? { 'Authorization': `Bearer ${user.access_token}` } : {})
+                },
                 body: JSON.stringify({ user_id: user.user_id, new_username: newUsername }),
             });
             const data = await response.json();
@@ -46,6 +51,43 @@ export default function AccountPage() {
         }
     };
     
+    const handleFileChange = (e) => {
+        const f = e.target.files?.[0];
+        setFile(f || null);
+        if (f) {
+            const url = URL.createObjectURL(f);
+            setPreview(url);
+        } else {
+            setPreview('');
+        }
+    };
+
+    const handleUpload = async () => {
+        if (!file) return;
+        setError('');
+        setMessage('');
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/account/profile-pic/upload`, {
+                method: 'POST',
+                headers: {
+                    ...(user?.access_token ? { 'Authorization': `Bearer ${user.access_token}` } : {})
+                },
+                body: formData,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Upload failed');
+            // Update stored user with new profile pic URL
+            login({ ...user, profile_pic_url: data.profile_pic_url });
+            setMessage('Profile picture updated!');
+            setPreview('');
+            setFile(null);
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
     const handlePasswordUpdate = async (e) => {
         e.preventDefault();
         setMessage(''); 
@@ -59,7 +101,10 @@ export default function AccountPage() {
         try {
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/account/password`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(user?.access_token ? { 'Authorization': `Bearer ${user.access_token}` } : {})
+                },
                 body: JSON.stringify({ 
                     user_id: user.user_id, 
                     old_password: oldPassword, 
@@ -94,10 +139,28 @@ export default function AccountPage() {
                 {message && <p className="text-green-400 text-center mb-4">{message}</p>}
                 {error && <p className="text-red-400 text-center mb-4">{error}</p>}
 
-                {/* Profile Picture Section (Placeholder) */}
+                {/* Profile Picture Section */}
                 <div className="mb-8 p-6 bg-slate-900/50 rounded-lg">
                     <h2 className="text-2xl font-bold text-white mb-4">Profile Picture</h2>
-                    <p className="text-gray-400">Profile picture upload functionality is coming soon!</p>
+                    <div className="flex items-center gap-4">
+                        <div className="w-20 h-20 rounded-full overflow-hidden border border-gray-700 bg-slate-800/70">
+                            {preview || user?.profile_pic_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={preview || user.profile_pic_url} alt="avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">No Image</div>
+                            )}
+                        </div>
+                        <div className="flex-1">
+                            <input type="file" accept="image/*" onChange={handleFileChange} className="text-sm text-gray-300" />
+                            <div className="mt-2 flex gap-2">
+                                <button onClick={handleUpload} disabled={!file} className="px-4 py-2 text-white bg-purple-600 rounded-md disabled:opacity-50">Upload</button>
+                                {preview && (
+                                    <button onClick={() => {setPreview(''); setFile(null);}} className="px-4 py-2 text-gray-300 bg-white/10 rounded-md">Cancel</button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Username Change Form */}

@@ -1,7 +1,6 @@
 # backend/crud.py
-from Backend import database, schemas, security
 from sqlalchemy.orm import Session
-# Change this line to make it a relative import
+# Use explicit relative imports to match package layout and avoid path issues
 from . import database, schemas, security
 
 def get_user_by_email(db: Session, email: str):
@@ -13,15 +12,15 @@ def get_user_by_username(db: Session, username: str):
 def get_user_by_mobile(db: Session, mobile_no: str):
     return db.query(database.User).filter(database.User.mobile_no == mobile_no).first()
 
-def create_user(db: Session, user: schemas.UserCreate):
+def create_user(db: Session, user: schemas.UserCreate, override_username: str | None = None):
     """
     Creates a new user in the database.
     This function now also saves the new user details and creates a default username.
     """
     hashed_password = security.hash_password(user.password)
     
-    # Create a default username from the email address (part before the '@')
-    default_username = user.email.split('@')[0]
+    # Create a default username from the email address (part before the '@') if not provided
+    default_username = override_username or user.email.split('@')[0]
 
     db_user = database.User(
         first_name=user.first_name,

@@ -115,8 +115,9 @@ export default function SignupPage() {
         throw new Error(data.detail || 'Failed to create account');
       }
       
-      const newUser = await response.json();
-      router.push(`/signup-success?username=${newUser.username}&email=${newUser.email}`);
+  const newUser = await response.json();
+  // Redirect to OTP verification screen with identifier (email)
+  router.push(`/verify-otp?identifier=${encodeURIComponent(newUser.email)}`);
 
     } catch (err) {
       setApiError(err.message);

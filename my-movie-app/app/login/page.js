@@ -29,8 +29,9 @@ export default function LoginPage() {
         throw new Error(data.detail || 'Failed to login');
       }
 
-      const userData = await response.json();
-      login(userData);
+  const userData = await response.json();
+  // Persist access_token for subsequent authenticated requests
+  login(userData);
       router.push('/chat');
 
     } catch (err) {

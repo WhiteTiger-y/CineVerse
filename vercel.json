@@ -3,17 +3,9 @@
     {
       "src": "my-movie-app/package.json",
       "use": "@vercel/next"
-    },
-    {
-      "src": "Backend/main.py",
-      "use": "@vercel/python"
     }
   ],
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/Backend/main.py"
-    },
     {
       "source": "/(.*)",
       "destination": "/my-movie-app"

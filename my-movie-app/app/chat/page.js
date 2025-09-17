@@ -52,7 +52,10 @@ export default function ChatPage() {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(user?.access_token ? { 'Authorization': `Bearer ${user.access_token}` } : {})
+        },
         body: JSON.stringify({
           message: input,
           session_id: String(user.user_id),

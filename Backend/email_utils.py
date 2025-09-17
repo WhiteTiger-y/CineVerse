@@ -9,19 +9,19 @@ configuration.api_key['api-key'] = os.getenv('BREVO_API_KEY')
 api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 # --------------------------------
 
-def send_welcome_email(to_email: str, first_name: str, username: str):
-    """Sends a welcome email to a new user using Brevo."""
+def send_welcome_email(to_email: str, first_name: str, username: str, otp_code: str | None = None):
+    """Sends a welcome email to a new user using Brevo. Optionally embeds an OTP code."""
     sender_email = os.getenv("SENDER_EMAIL")
     if not sender_email:
         print("Error: SENDER_EMAIL not set in .env")
         return
 
-    subject = "Welcome to CineVerse AI!"
+    subject = "Welcome to CineVerse AI! Verify your account"
     html_content = f"""
     <div style="font-family: sans-serif; padding: 20px; color: #333;">
         <h2>Welcome to CineVerse AI, {first_name}!</h2>
         <p>Your account has been created successfully. Your username is: <strong>{username}</strong></p>
-        <p>You can now log in and start discovering your next favorite movie.</p>
+        {f'<p>To complete your signup, please verify your account using the 6-digit code shown in your browser, or enter this code if asked:</p><div style="font-size: 24px; letter-spacing: 6px; font-weight: bold; color: #7c3aed;">{otp_code}</div><p>The code expires in 10 minutes.</p>' if otp_code else ''}
         <p><em>The CineVerse AI Team</em></p>
     </div>
     """
@@ -41,6 +41,28 @@ def send_welcome_email(to_email: str, first_name: str, username: str):
         print(f"Welcome email sent to {to_email} via Brevo. Response: {api_response}")
     except ApiException as e:
         print(f"Error sending welcome email to {to_email} via Brevo: {e}")
+
+def send_otp_email(to_email: str, first_name: str, otp_code: str):
+    sender_email = os.getenv("SENDER_EMAIL")
+    subject = "Your CineVerse AI verification code"
+    html_content = f"""
+    <div style="font-family: sans-serif; padding: 20px; color: #333;">
+        <h2>Verify your CineVerse AI account</h2>
+        <p>Use the code below to verify your account:</p>
+        <div style="font-size: 24px; letter-spacing: 6px; font-weight: bold; color: #7c3aed;">{otp_code}</div>
+        <p>This code expires in 10 minutes.</p>
+    </div>
+    """
+    sender = {"name": "CineVerse AI", "email": sender_email}
+    to = [{"email": to_email, "name": first_name}]
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+        to=to, sender=sender, subject=subject, html_content=html_content
+    )
+    try:
+        api_response = api_instance.send_transac_email(send_smtp_email)
+        print(f"OTP email sent to {to_email} via Brevo. Response: {api_response}")
+    except ApiException as e:
+        print(f"Error sending OTP email to {to_email} via Brevo: {e}")
 
 def send_password_reset_email(to_email: str, token: str):
     """Sends a password reset email to a user using Brevo."""

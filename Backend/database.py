@@ -1,7 +1,8 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Text, DateTime, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from datetime import datetime
 
 # --- THIS IS THE UPDATED SECTION ---
 # Find the absolute path to the .env file and load it
@@ -35,6 +36,9 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     profile_pic_url = Column(String, nullable=True) 
+    is_verified = Column(Boolean, default=False, nullable=False)
+    otp_code = Column(String, nullable=True)
+    otp_expires_at = Column(DateTime, nullable=True)
 
     suggested_movies = relationship("SuggestedMovie", back_populates="owner")
 
@@ -46,6 +50,16 @@ class SuggestedMovie(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
 
     owner = relationship("User", back_populates="suggested_movies")
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    sender = Column(String, nullable=False)  # 'user' or 'bot'
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 def create_db_and_tables():
