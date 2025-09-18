@@ -9,6 +9,27 @@ import InputBar from "../components/InputBar";
 import EmotionCapture from "../components/EmotionCapture";
 
 export default function ChatPage() {
+  const { user, logout } = useAuth();
+  const router = useRouter();
+
+  const [sessions, setSessions] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState("");
+  const [messages, setMessages] = useState([
+    { sender: "bot", text: "Welcome! How are you feeling today?" },
+  ]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [context, setContext] = useState({
+    mood: "",
+    expression: "",
+    age: "",
+    gender: "",
+  });
+  const [pollMs, setPollMs] = useState(200);
+  const [webcamActive, setWebcamActive] = useState(false);
+  const [detectionLog, setDetectionLog] = useState([]);
+  const detectionTimer = useRef(null);
+
   // Log detections every 5 or 10 seconds when webcam is active
   useEffect(() => {
     if (!webcamActive) {
@@ -30,26 +51,6 @@ export default function ChatPage() {
       if (detectionTimer.current) clearInterval(detectionTimer.current);
     };
   }, [webcamActive, context.expression, context.age, context.gender, pollMs]);
-  const { user, logout } = useAuth();
-  const router = useRouter();
-
-  const [sessions, setSessions] = useState([]);
-  const [activeSessionId, setActiveSessionId] = useState("");
-  const [messages, setMessages] = useState([
-    { sender: "bot", text: "Welcome! How are you feeling today?" },
-  ]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [context, setContext] = useState({
-    mood: "",
-    expression: "",
-    age: "",
-    gender: "",
-  });
-  const [pollMs, setPollMs] = useState(200);
-  const [webcamActive, setWebcamActive] = useState(false);
-  const [detectionLog, setDetectionLog] = useState([]);
-  const detectionTimer = useRef(null);
 
   // Redirect if not logged in
   useEffect(() => {
