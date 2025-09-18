@@ -23,12 +23,13 @@ async function loadDetector() {
 }
 
 
-export default function EmotionCapture({ onChange, intervalMs = 200 }) {
+export default function EmotionCapture({ onChange, intervalMs = 200, setWebcamActive }) {
   const videoRef = useRef(null);
   const [enabled, setEnabled] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (setWebcamActive) setWebcamActive(enabled);
     if (!enabled) return;
     let stream;
     let stopped = false;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
@@ -8,7 +8,6 @@ import MessageList from '../components/MessageList';
 import InputBar from '../components/InputBar';
 import EmotionCapture from '../components/EmotionCapture';
 
-export default function ChatPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
@@ -19,6 +18,9 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [context, setContext] = useState({ mood: '', expression: '', age: '', gender: '' });
   const [pollMs, setPollMs] = useState(200);
+  const [webcamActive, setWebcamActive] = useState(false);
+  const [detectionLog, setDetectionLog] = useState([]);
+  const detectionTimer = useRef(null);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -221,21 +223,21 @@ export default function ChatPage() {
               <input
                 placeholder="Expression (e.g., happy)"
                 value={context.expression}
-                onChange={(e) => setContext((c) => ({ ...c, expression: e.target.value }))}
-                className="w-full p-1 text-sm bg-black/30 text-white rounded border border-white/20"
+                readOnly={webcamActive}
+                className={`w-full p-1 text-sm bg-black/30 text-white rounded border border-white/20 ${webcamActive ? 'opacity-60 cursor-not-allowed' : ''}`}
               />
               <div className="flex gap-1">
                 <input
                   placeholder="Age"
                   value={context.age}
-                  onChange={(e) => setContext((c) => ({ ...c, age: e.target.value }))}
-                  className="w-1/2 p-1 text-sm bg-black/30 text-white rounded border border-white/20"
+                  readOnly={webcamActive}
+                  className={`w-1/2 p-1 text-sm bg-black/30 text-white rounded border border-white/20 ${webcamActive ? 'opacity-60 cursor-not-allowed' : ''}`}
                 />
                 <input
                   placeholder="Gender"
                   value={context.gender}
-                  onChange={(e) => setContext((c) => ({ ...c, gender: e.target.value }))}
-                  className="w-1/2 p-1 text-sm bg-black/30 text-white rounded border border-white/20"
+                  readOnly={webcamActive}
+                  className={`w-1/2 p-1 text-sm bg-black/30 text-white rounded border border-white/20 ${webcamActive ? 'opacity-60 cursor-not-allowed' : ''}`}
                 />
               </div>
               <div className="flex items-center justify-between text-xs text-gray-300">
@@ -250,7 +252,52 @@ export default function ChatPage() {
                   <option value={500}>Slow (500ms)</option>
                 </select>
               </div>
-              <EmotionCapture intervalMs={pollMs} onChange={(data) => setContext((c) => ({ ...c, ...data }))} />
+              <EmotionCapture
+                intervalMs={pollMs}
+                onChange={(data) => {
+                  // If webcam is running, update context and log every 5 or 10 seconds
+                  if (data && (data.expression || data.age || data.gender)) {
+                    setContext((c) => ({ ...c, ...data }));
+                  }
+                }}
+                setWebcamActive={setWebcamActive}
+              />
+              {/* Detection log */}
+              {webcamActive && (
+                <div className="mt-2 max-h-32 overflow-y-auto bg-black/20 rounded p-2 text-xs text-white border border-white/10">
+                  <div className="mb-1 font-semibold text-[11px] text-gray-300">Detection Log</div>
+                  {detectionLog.length === 0 ? (
+                    <div className="text-gray-400">No detections yet.</div>
+                  ) : (
+                    detectionLog.map((log, i) => (
+                      <div key={i} className="mb-1">
+                        <span className="text-gray-400">[{log.time}]</span> Expression: <span className="text-pink-200">{log.expression || '-'}</span>, Age: <span className="text-blue-200">{log.age || '-'}</span>, Gender: <span className="text-green-200">{log.gender || '-'}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+  // Log detections every 5 or 10 seconds when webcam is active
+  useEffect(() => {
+    if (!webcamActive) {
+      if (detectionTimer.current) clearInterval(detectionTimer.current);
+      return;
+    }
+    detectionTimer.current = setInterval(() => {
+      setDetectionLog((log) => [
+        ...log,
+        {
+          time: new Date().toLocaleTimeString(),
+          expression: context.expression,
+          age: context.age,
+          gender: context.gender,
+        },
+      ].slice(-20)); // keep last 20 logs
+    }, pollMs >= 10000 ? 10000 : 5000); // every 5s or 10s
+    return () => {
+      if (detectionTimer.current) clearInterval(detectionTimer.current);
+    };
+  }, [webcamActive, context.expression, context.age, context.gender, pollMs]);
             </div>
           </aside>
 
