@@ -2,15 +2,29 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-// Lazy-load face-api to reduce initial bundle
+// CDN-only model loading with explicit error handling
+const CDN_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+
 let faceapiPromise;
 async function loadFaceApi() {
   if (!faceapiPromise) {
     faceapiPromise = (async () => {
       const faceapi = await import('@vladmandic/face-api');
-      await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model');
-      await faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model');
-      await faceapi.nets.ageGenderNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model');
+      
+      // Load models from CDN only - no local fallback
+      try {
+        console.log('Loading face-api models from CDN...');
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(CDN_MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(CDN_MODEL_URL),
+          faceapi.nets.ageGenderNet.loadFromUri(CDN_MODEL_URL)
+        ]);
+        console.log('All face-api models loaded successfully from CDN');
+        return faceapi;
+      } catch (error) {
+        console.error('Failed to load face-api models from CDN:', error);
+        throw new Error(`CDN model loading failed: ${error.message}`);
+      }
     })();
   }
   return faceapiPromise;
