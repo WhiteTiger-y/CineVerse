@@ -174,14 +174,14 @@ export default function ChatPage() {
     <main className="flex flex-col h-screen w-screen shiny-gradient-bg">
       <Navbar user={user} handleLogout={handleLogout} />
       <div className="flex-grow flex items-center justify-center p-4 overflow-hidden">
-        <div className="w-full max-w-6xl h-full bg-transparent rounded-2xl flex gap-4 drop-shadow-3d-glow">
+  <div className="w-full max-w-6xl h-full bg-transparent rounded-2xl flex gap-4 drop-shadow-3d-glow relative">
           {/* Sidebar */}
-          <aside className="w-72 bg-slate-800/40 rounded-2xl p-3 border border-white/10 flex flex-col">
+          <aside className="w-72 bg-slate-800/40 rounded-2xl p-3 border border-white/10 flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-white font-semibold">Chats</h2>
               <button onClick={handleNewChat} className="text-xs px-2 py-1 bg-white/10 border border-white/20 rounded text-white hover:bg-white/20">New</button>
             </div>
-            <div className="flex-1 overflow-y-auto space-y-1">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
               {sessions.map((s) => (
                 <div
                   key={s.session_id}
@@ -210,7 +210,7 @@ export default function ChatPage() {
               )}
             </div>
 
-            <div className="mt-3 border-t border-white/10 pt-2 space-y-2">
+            <div className="mt-3 border-t border-white/10 pt-2 space-y-2 overflow-y-auto max-h-80">
               <div className="text-white text-sm">Context</div>
               <input
                 placeholder="Mood (e.g., calm)"
@@ -255,7 +255,7 @@ export default function ChatPage() {
           </aside>
 
           {/* Chat area */}
-          <div className="flex-grow bg-chat-area dotted-texture overflow-y-auto rounded-t-2xl">
+          <div className="flex-grow bg-chat-area dotted-texture overflow-y-auto rounded-t-2xl min-h-0">
             <MessageList messages={messages} />
           </div>
 
