@@ -8,10 +8,9 @@ async function loadFaceApi() {
   if (!faceapiPromise) {
     faceapiPromise = (async () => {
       const faceapi = await import('@vladmandic/face-api');
-      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-      await faceapi.nets.faceExpressionNet.loadFromUri('/models');
-      await faceapi.nets.ageGenderNet.loadFromUri('/models');
-      return faceapi;
+      await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model');
+      await faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model');
+      await faceapi.nets.ageGenderNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model');
     })();
   }
   return faceapiPromise;
