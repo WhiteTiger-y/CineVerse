@@ -2,28 +2,28 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-// CDN-only model loading with explicit error handling
-const CDN_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+
+// Local model loading from /models (public/models)
+const LOCAL_MODEL_URL = '/models';
 
 let faceapiPromise;
 async function loadFaceApi() {
   if (!faceapiPromise) {
     faceapiPromise = (async () => {
       const faceapi = await import('@vladmandic/face-api');
-      
-      // Load models from CDN only - no local fallback
+      // Load models from local /models folder
       try {
-        console.log('Loading face-api models from CDN...');
+        console.log('Loading face-api models from /models...');
         await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(CDN_MODEL_URL),
-          faceapi.nets.faceExpressionNet.loadFromUri(CDN_MODEL_URL),
-          faceapi.nets.ageGenderNet.loadFromUri(CDN_MODEL_URL)
+          faceapi.nets.tinyFaceDetector.loadFromUri(LOCAL_MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(LOCAL_MODEL_URL),
+          faceapi.nets.ageGenderNet.loadFromUri(LOCAL_MODEL_URL)
         ]);
-        console.log('All face-api models loaded successfully from CDN');
+        console.log('All face-api models loaded successfully from /models');
         return faceapi;
       } catch (error) {
-        console.error('Failed to load face-api models from CDN:', error);
-        throw new Error(`CDN model loading failed: ${error.message}`);
+        console.error('Failed to load face-api models from /models:', error);
+        throw new Error(`Local model loading failed: ${error.message}`);
       }
     })();
   }
