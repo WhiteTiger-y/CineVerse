@@ -1,34 +1,27 @@
+
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
 
-
-// Local model loading from /models (public/models)
-const LOCAL_MODEL_URL = '/models';
-
-let faceapiPromise;
-async function loadFaceApi() {
-  if (!faceapiPromise) {
-    faceapiPromise = (async () => {
-      const faceapi = await import('@vladmandic/face-api');
-      // Load models from local /models folder
-      try {
-        console.log('Loading face-api models from /models...');
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(LOCAL_MODEL_URL),
-          faceapi.nets.faceExpressionNet.loadFromUri(LOCAL_MODEL_URL),
-          faceapi.nets.ageGenderNet.loadFromUri(LOCAL_MODEL_URL)
-        ]);
-        console.log('All face-api models loaded successfully from /models');
-        return faceapi;
-      } catch (error) {
-        console.error('Failed to load face-api models from /models:', error);
-        throw new Error(`Local model loading failed: ${error.message}`);
-      }
+// Use @tensorflow-models/face-landmarks-detection for browser-based face detection
+let detectorPromise;
+async function loadDetector() {
+  if (!detectorPromise) {
+    detectorPromise = (async () => {
+      const tf = await import('@tensorflow/tfjs');
+      const faceLandmarksDetection = await import('@tensorflow-models/face-landmarks-detection');
+      // Load the MediaPipe FaceMesh model
+      const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
+      const detector = await faceLandmarksDetection.createDetector(model, {
+        runtime: 'tfjs',
+        maxFaces: 1,
+      });
+      return detector;
     })();
   }
-  return faceapiPromise;
+  return detectorPromise;
 }
+
 
 export default function EmotionCapture({ onChange, intervalMs = 200 }) {
   const videoRef = useRef(null);
@@ -39,35 +32,27 @@ export default function EmotionCapture({ onChange, intervalMs = 200 }) {
     if (!enabled) return;
     let stream;
     let stopped = false;
-  let rafId;
-  let timeoutId;
-    let faceapi;
+    let rafId;
+    let timeoutId;
+    let detector;
 
     const start = async () => {
       try {
-        faceapi = await loadFaceApi();
+        detector = await loadDetector();
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 320, height: 240 } });
         if (!videoRef.current) return;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
 
-        const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
-
         const tick = async () => {
           if (stopped) return;
           try {
-            const result = await faceapi
-              .detectSingleFace(videoRef.current, options)
-              .withFaceExpressions()
-              .withAgeAndGender();
-            if (result) {
-              const expressions = result.expressions || {};
-              // find dominant expression
-              const entries = Object.entries(expressions);
-              const dominant = entries.length ? entries.reduce((a, b) => (a[1] > b[1] ? a : b))[0] : '';
-              const age = result.age ? Math.round(result.age) : undefined;
-              const gender = result.gender || undefined;
-              onChange?.({ expression: dominant, age, gender });
+            const faces = await detector.estimateFaces(videoRef.current, { flipHorizontal: false });
+            if (faces && faces.length > 0) {
+              // Only bounding box and landmarks are available
+              onChange?.({ face: true, box: faces[0].box, keypoints: faces[0].keypoints });
+            } else {
+              onChange?.({ face: false });
             }
           } catch (e) {
             // swallow per-frame errors
@@ -119,7 +104,7 @@ export default function EmotionCapture({ onChange, intervalMs = 200 }) {
       </div>
       {error && <div className="text-xs text-red-300">{error}</div>}
       <video ref={videoRef} className={`w-full rounded ${enabled ? 'opacity-100' : 'opacity-40'}`} muted playsInline />
-      <p className="text-xs text-gray-300">We detect dominant expression, age, and gender locally in your browser. No raw video is sent to the server.</p>
+      <p className="text-xs text-gray-300">We detect faces and landmarks locally in your browser. No raw video is sent to the server.</p>
     </div>
   );
 }
