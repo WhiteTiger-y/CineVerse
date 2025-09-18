@@ -137,11 +137,6 @@ def signup_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         username=new_user.username,
         otp_code=otp_code,
     )
-    # Also send a separate OTP email for redundancy (optional)
-    try:
-        email_utils.send_otp_email(new_user.email, new_user.first_name, otp_code)
-    except Exception:
-        pass
     return new_user
 
 @app.post("/login")
@@ -392,6 +387,11 @@ agent_executor = AgentExecutor(
 class ChatRequest(BaseModel):
     message: str
     session_id: str
+    # Optional context captured from browser (facial analysis, etc.)
+    mood: str | None = None
+    expression: str | None = None
+    age: int | None = None
+    gender: str | None = None
 
 @app.get("/")
 def read_root():
@@ -423,8 +423,20 @@ async def handle_chat(request: ChatRequest, db: Session = Depends(get_db), curre
         else:
             chat_history.append(AIMessage(content=row.message))
 
+    # Inject optional user context to inform recommendations
+    context_bits = []
+    if request.mood:
+        context_bits.append(f"mood={request.mood}")
+    if request.expression:
+        context_bits.append(f"expression={request.expression}")
+    if request.age is not None:
+        context_bits.append(f"estimated_age={request.age}")
+    if request.gender:
+        context_bits.append(f"gender={request.gender}")
+    preface = f"Context (from user/device): {', '.join(context_bits)}\n" if context_bits else ""
+
     response = await agent_executor.ainvoke({
-        "input": request.message,
+        "input": preface + request.message,
         "chat_history": chat_history,
     })
     output = response.get('output', "I'm sorry, I encountered an issue.")
@@ -435,6 +447,79 @@ async def handle_chat(request: ChatRequest, db: Session = Depends(get_db), curre
     db.commit()
 
     return {"sender": "bot", "message": output}
+
+
+# --- Chat Sessions Management ---
+from Backend.database import ChatMessage as ChatMessageModel
+from uuid import uuid4
+
+class ChatSession(BaseModel):
+    session_id: str
+    last_message_preview: str | None = None
+    updated_at: str | None = None
+    title: str | None = None
+
+@app.get("/chat/sessions", response_model=list[ChatSession])
+def list_chat_sessions(db: Session = Depends(get_db), current=Depends(get_current_user)):
+    user_id = int(current.get('sub'))
+    # Get distinct session ids for this user
+    session_ids = [row[0] for row in db.query(ChatMessageModel.session_id).filter(ChatMessageModel.user_id==user_id).distinct().all()]
+    sessions: list[ChatSession] = []
+    for sid in session_ids:
+        last = (
+            db.query(ChatMessageModel)
+            .filter(ChatMessageModel.user_id==user_id, ChatMessageModel.session_id==sid)
+            .order_by(ChatMessageModel.created_at.desc())
+            .first()
+        )
+        first_user_msg = (
+            db.query(ChatMessageModel)
+            .filter(ChatMessageModel.user_id==user_id, ChatMessageModel.session_id==sid, ChatMessageModel.sender=='user')
+            .order_by(ChatMessageModel.created_at.asc())
+            .first()
+        )
+        sessions.append(ChatSession(
+            session_id=sid,
+            last_message_preview=(last.message[:80] + '…') if last else None,
+            updated_at=last.created_at.isoformat() if last else None,
+            title=(first_user_msg.message[:40] + '…') if first_user_msg else 'New Chat'
+        ))
+    # Sort newest first
+    sessions.sort(key=lambda s: s.updated_at or '', reverse=True)
+    return sessions
+
+class ChatMessageOut(BaseModel):
+    id: int
+    sender: str
+    message: str
+    created_at: str
+
+@app.get("/chat/messages", response_model=list[ChatMessageOut])
+def get_chat_messages(session_id: str, db: Session = Depends(get_db), current=Depends(get_current_user)):
+    user_id = int(current.get('sub'))
+    rows = (
+        db.query(ChatMessageModel)
+        .filter(ChatMessageModel.user_id==user_id, ChatMessageModel.session_id==session_id)
+        .order_by(ChatMessageModel.created_at.asc())
+        .all()
+    )
+    return [ChatMessageOut(id=r.id, sender=r.sender, message=r.message, created_at=r.created_at.isoformat()) for r in rows]
+
+class NewSessionResponse(BaseModel):
+    session_id: str
+
+@app.post("/chat/session", response_model=NewSessionResponse)
+def create_chat_session(current=Depends(get_current_user)):
+    # Stateless creation; messages will be created when user sends one
+    return NewSessionResponse(session_id=str(uuid4()))
+
+@app.delete("/chat/session/{session_id}")
+def delete_chat_session(session_id: str, db: Session = Depends(get_db), current=Depends(get_current_user)):
+    user_id = int(current.get('sub'))
+    q = db.query(ChatMessageModel).filter(ChatMessageModel.user_id==user_id, ChatMessageModel.session_id==session_id)
+    deleted = q.delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": deleted}
 
 
 # --- Main Entry Point ---

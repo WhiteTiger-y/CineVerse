@@ -116,8 +116,8 @@ export default function SignupPage() {
       }
       
   const newUser = await response.json();
-  // Redirect to OTP verification screen with identifier (email)
-  router.push(`/verify-otp?identifier=${encodeURIComponent(newUser.email)}`);
+  // Redirect to OTP verification screen with identifier (email) and username for display
+  router.push(`/verify-otp?identifier=${encodeURIComponent(newUser.email)}&username=${encodeURIComponent(newUser.username)}`);
 
     } catch (err) {
       setApiError(err.message);

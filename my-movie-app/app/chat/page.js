@@ -1,52 +1,109 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
+import Navbar from '../components/Navbar';
 import MessageList from '../components/MessageList';
 import InputBar from '../components/InputBar';
-import Navbar from '../components/Navbar';
+import EmotionCapture from '../components/EmotionCapture';
 
 export default function ChatPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  const [messages, setMessages] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedMessages = localStorage.getItem('chatMessages');
-      if (savedMessages && savedMessages.length > 2) {
-        return JSON.parse(savedMessages);
-      }
-    }
-    return [{ sender: 'bot', text: `Welcome! How can I help find the perfect movie for you today?` }];
-  });
-
+  const [sessions, setSessions] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState('');
+  const [messages, setMessages] = useState([{ sender: 'bot', text: 'Welcome! How are you feeling today?' }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [context, setContext] = useState({ mood: '', expression: '', age: '', gender: '' });
+  const [pollMs, setPollMs] = useState(200);
 
+  // Redirect if not logged in
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
+    if (!user) router.push('/login');
   }, [user, router]);
 
+  // Load sessions on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('chatMessages', JSON.stringify(messages));
+    const loadSessions = async () => {
+      if (!user?.access_token) return;
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/sessions`, {
+        headers: { Authorization: `Bearer ${user.access_token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSessions(data);
+        const last = typeof window !== 'undefined' ? localStorage.getItem('activeSessionId') : '';
+        const initial = last || data[0]?.session_id || '';
+        setActiveSessionId(initial);
+      }
+    };
+    loadSessions();
+  }, [user?.access_token]);
+
+  // Persist active session
+  useEffect(() => {
+    if (typeof window !== 'undefined' && activeSessionId) {
+      localStorage.setItem('activeSessionId', activeSessionId);
     }
-  }, [messages]);
+  }, [activeSessionId]);
+
+  // Load messages for the active session
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (!user?.access_token || !activeSessionId) return;
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/chat/messages?session_id=${encodeURIComponent(activeSessionId)}`,
+        { headers: { Authorization: `Bearer ${user.access_token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = data.map((m) => ({ sender: m.sender === 'bot' ? 'bot' : 'user', text: m.message }));
+        setMessages(mapped.length ? mapped : [{ sender: 'bot', text: 'New chat started. How is your day going?' }]);
+      } else {
+        setMessages([{ sender: 'bot', text: 'New chat started. How is your day going?' }]);
+      }
+    };
+    loadMessages();
+  }, [user?.access_token, activeSessionId]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!user || !user.user_id) {
-      console.error("Cannot send message: User or User ID is missing.");
-      setMessages((prev) => [...prev, { sender: 'bot', text: "Error: You are not logged in correctly. Please try refreshing or logging in again." }]);
-      return;
-    }
+    if (!user?.access_token) return;
     if (!input.trim() || isLoading) return;
 
     const userMessage = { sender: 'user', text: input };
     setMessages((prev) => [...prev, userMessage]);
+    // Ensure we have a session id; create one if needed
+    let sid = activeSessionId;
+    if (!sid) {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/session`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${user.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          sid = data.session_id;
+          setActiveSessionId(sid);
+          // refresh sessions list
+          const sessionsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/sessions`, {
+            headers: { Authorization: `Bearer ${user.access_token}` },
+          });
+          if (sessionsRes.ok) setSessions(await sessionsRes.json());
+        }
+      } catch {}
+    }
+    const payload = {
+      message: input,
+      session_id: sid,
+      mood: context.mood || undefined,
+      expression: context.expression || undefined,
+      age: context.age ? Number(context.age) : undefined,
+      gender: context.gender || undefined,
+    };
     setInput('');
     setIsLoading(true);
     try {
@@ -54,27 +111,18 @@ export default function ChatPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(user?.access_token ? { 'Authorization': `Bearer ${user.access_token}` } : {})
+          Authorization: `Bearer ${user.access_token}`,
         },
-        body: JSON.stringify({
-          message: input,
-          session_id: String(user.user_id),
-        }),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Network response was not ok');
+        throw new Error(errorData.detail || 'Request failed');
       }
       const botData = await response.json();
-      const botMessage = { sender: 'bot', text: botData.message };
-      setMessages((prev) => [...prev, botMessage]);
-    } catch (error) {
-      console.error('API call failed:', error);
-      const errorMessage = {
-        sender: 'bot',
-        text: `Sorry, an error occurred: ${error.message}`,
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, { sender: 'bot', text: botData.message }]);
+    } catch (err) {
+      setMessages((prev) => [...prev, { sender: 'bot', text: `Sorry, an error occurred: ${err.message}` }]);
     } finally {
       setIsLoading(false);
     }
@@ -82,37 +130,144 @@ export default function ChatPage() {
 
   const handleLogout = () => {
     logout();
-    setMessages([{ sender: 'bot', text: "Welcome to CineVerse AI!" }]);
     router.push('/login');
   };
 
-  if (!user) {
-    return null;
-  }
+  const handleNewChat = async () => {
+    if (!user?.access_token) return;
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/session`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${user.access_token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setActiveSessionId(data.session_id);
+      setMessages([{ sender: 'bot', text: 'New chat started. How are you feeling today?' }]);
+      const sessionsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/sessions`, {
+        headers: { Authorization: `Bearer ${user.access_token}` },
+      });
+      if (sessionsRes.ok) setSessions(await sessionsRes.json());
+    }
+  };
+
+  const handleDeleteChat = async (sid) => {
+    if (!user?.access_token) return;
+    if (!confirm('Delete this chat? This cannot be undone.')) return;
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/session/${encodeURIComponent(sid)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${user.access_token}` },
+    });
+    if (res.ok) {
+      const filtered = sessions.filter((s) => s.session_id !== sid);
+      setSessions(filtered);
+      if (activeSessionId === sid) {
+        const next = filtered[0]?.session_id || '';
+        setActiveSessionId(next);
+        setMessages([{ sender: 'bot', text: next ? 'Switched chat.' : 'Chat deleted. Start a new one?' }]);
+      }
+    }
+  };
+
+  if (!user) return null;
 
   return (
     <main className="flex flex-col h-screen w-screen shiny-gradient-bg">
       <Navbar user={user} handleLogout={handleLogout} />
-      
-      {/* This container will fill the remaining space and prevent page scroll */}
       <div className="flex-grow flex items-center justify-center p-4 overflow-hidden">
-        <div className="w-full max-w-3xl h-full bg-transparent rounded-2xl flex flex-col drop-shadow-3d-glow">
-          
-          {/* This is now the ONLY scrollable element */}
+        <div className="w-full max-w-6xl h-full bg-transparent rounded-2xl flex gap-4 drop-shadow-3d-glow">
+          {/* Sidebar */}
+          <aside className="w-72 bg-slate-800/40 rounded-2xl p-3 border border-white/10 flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-white font-semibold">Chats</h2>
+              <button onClick={handleNewChat} className="text-xs px-2 py-1 bg-white/10 border border-white/20 rounded text-white hover:bg-white/20">New</button>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-1">
+              {sessions.map((s) => (
+                <div
+                  key={s.session_id}
+                  className={`group p-2 rounded cursor-pointer ${activeSessionId === s.session_id ? 'bg-white/15' : 'hover:bg-white/10'}`}
+                  onClick={() => setActiveSessionId(s.session_id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-white truncate max-w-[160px]">{s.title || 'New Chat'}</div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteChat(s.session_id);
+                      }}
+                      className="opacity-60 group-hover:opacity-100 text-xs text-red-300 hover:text-red-200"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  {s.last_message_preview && (
+                    <div className="text-xs text-gray-300 truncate">{s.last_message_preview}</div>
+                  )}
+                </div>
+              ))}
+              {sessions.length === 0 && (
+                <div className="text-xs text-gray-300">No chats yet.</div>
+              )}
+            </div>
+
+            <div className="mt-3 border-t border-white/10 pt-2 space-y-2">
+              <div className="text-white text-sm">Context</div>
+              <input
+                placeholder="Mood (e.g., calm)"
+                value={context.mood}
+                onChange={(e) => setContext((c) => ({ ...c, mood: e.target.value }))}
+                className="w-full p-1 text-sm bg-black/30 text-white rounded border border-white/20"
+              />
+              <input
+                placeholder="Expression (e.g., happy)"
+                value={context.expression}
+                onChange={(e) => setContext((c) => ({ ...c, expression: e.target.value }))}
+                className="w-full p-1 text-sm bg-black/30 text-white rounded border border-white/20"
+              />
+              <div className="flex gap-1">
+                <input
+                  placeholder="Age"
+                  value={context.age}
+                  onChange={(e) => setContext((c) => ({ ...c, age: e.target.value }))}
+                  className="w-1/2 p-1 text-sm bg-black/30 text-white rounded border border-white/20"
+                />
+                <input
+                  placeholder="Gender"
+                  value={context.gender}
+                  onChange={(e) => setContext((c) => ({ ...c, gender: e.target.value }))}
+                  className="w-1/2 p-1 text-sm bg-black/30 text-white rounded border border-white/20"
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs text-gray-300">
+                <label>Polling</label>
+                <select
+                  className="p-1 bg-black/30 text-white rounded border border-white/20"
+                  value={pollMs}
+                  onChange={(e) => setPollMs(Number(e.target.value))}
+                >
+                  <option value={100}>Fast (100ms)</option>
+                  <option value={200}>Normal (200ms)</option>
+                  <option value={500}>Slow (500ms)</option>
+                </select>
+              </div>
+              <EmotionCapture intervalMs={pollMs} onChange={(data) => setContext((c) => ({ ...c, ...data }))} />
+            </div>
+          </aside>
+
+          {/* Chat area */}
           <div className="flex-grow bg-chat-area dotted-texture overflow-y-auto rounded-t-2xl">
             <MessageList messages={messages} />
           </div>
 
-          {isLoading && (
-            <div className="p-2 text-sm text-pink-300 animate-pulse bg-chat-area text-center">
-              Bot is typing...
-            </div>
-          )}
-          <InputBar
-            input={input}
-            setInput={setInput}
-            handleSendMessage={handleSendMessage}
-          />
+          {/* Input */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-3xl">
+            {isLoading && (
+              <div className="p-2 text-sm text-pink-300 animate-pulse bg-chat-area text-center rounded-t-lg">
+                Bot is typing...
+              </div>
+            )}
+            <InputBar input={input} setInput={setInput} handleSendMessage={handleSendMessage} />
+          </div>
         </div>
       </div>
     </main>

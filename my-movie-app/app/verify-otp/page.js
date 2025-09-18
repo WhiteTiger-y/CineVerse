@@ -8,6 +8,8 @@ function OtpForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const identifier = searchParams.get('identifier') || '';
+  const usernameFromQuery = searchParams.get('username') || '';
+  const displayName = usernameFromQuery || identifier;
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -79,8 +81,9 @@ function OtpForm() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center shiny-gradient-bg p-4">
       <div className="w-full max-w-md bg-gradient-to-br from-slate-800/80 to-slate-900/60 backdrop-blur-lg p-8 rounded-2xl shadow-3d-glow border border-purple-500/30 text-center">
-        <h1 className="text-4xl font-orbitron font-bold text-white mb-4">Verify your account</h1>
-        <p className="text-gray-300 mb-6">Enter the 6-digit code sent to {identifier}</p>
+  <h1 className="text-4xl font-orbitron font-bold text-white mb-1">Verify your account</h1>
+  <p className="text-lg text-white font-semibold mb-1">{displayName}</p>
+  <p className="text-gray-300 mb-6">Enter the 6-digit code sent to {identifier}</p>
 
         <form onSubmit={handleVerify}>
           <div className="flex justify-center gap-2 mb-6">

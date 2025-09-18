@@ -21,7 +21,7 @@ def send_welcome_email(to_email: str, first_name: str, username: str, otp_code: 
     <div style="font-family: sans-serif; padding: 20px; color: #333;">
         <h2>Welcome to CineVerse AI, {first_name}!</h2>
         <p>Your account has been created successfully. Your username is: <strong>{username}</strong></p>
-        {f'<p>To complete your signup, please verify your account using the 6-digit code shown in your browser, or enter this code if asked:</p><div style="font-size: 24px; letter-spacing: 6px; font-weight: bold; color: #7c3aed;">{otp_code}</div><p>The code expires in 10 minutes.</p>' if otp_code else ''}
+        {f'<p>To complete your signup, please verify your account using this 6-digit code:</p><div style="font-size: 24px; letter-spacing: 6px; font-weight: bold; color: #7c3aed;">{otp_code}</div><p>The code expires in 10 minutes.</p>' if otp_code else ''}
         <p><em>The CineVerse AI Team</em></p>
     </div>
     """
