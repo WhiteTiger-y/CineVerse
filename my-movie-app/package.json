@@ -14,8 +14,9 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-markdown": "^9.0.0",
-    "@tensorflow/tfjs": "^4.20.0",
-    "@vladmandic/face-api": "^1.7.12"
+  "@tensorflow/tfjs": "^4.20.0",
+  "@tensorflow-models/face-landmarks-detection": "^2.0.0",
+  "@vladmandic/face-api": "^1.7.12"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
